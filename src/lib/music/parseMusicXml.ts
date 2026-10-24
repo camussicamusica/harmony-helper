@@ -1,8 +1,22 @@
 import type { OpenSheetMusicDisplay } from "opensheetmusicdisplay";
 import type { Hand, ScheduledNote } from "./types";
 import { midiToName } from "./midiUtils";
+import { durationNameFromWhole } from "./naming";
+import { markPhrases } from "./melodicLine";
 import { noteColor, noteTargetOn } from "@/lib/colors/store";
 import { PLAIN_COLOR } from "@/lib/colors/defaults";
+
+const LETTER_BY_SEMITONE: Record<number, string> = { 0: "C", 2: "D", 4: "E", 5: "F", 7: "G", 9: "A", 11: "B" };
+
+function spellPitch(pitch: any, midi: number): string {
+  const letter = LETTER_BY_SEMITONE[pitch?.FundamentalNote as number];
+  const alter = Math.round(pitch?.AccidentalHalfTones ?? 0);
+  if (letter === undefined) {
+    // Fall back to sharps from the MIDI number.
+    return ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"][midi % 12];
+  }
+  return letter + (alter > 0 ? "#".repeat(alter) : "b".repeat(-alter));
+}
 
 export interface ParseResult {
   notes: ScheduledNote[];
@@ -135,6 +149,11 @@ export function parseSheetToNotes(osmd: OpenSheetMusicDisplay, bpm = 90): ParseR
               if (aEl) accidentalEls.push(aEl);
             }
 
+            const typeLen = src.TypeLength?.RealValue;
+            const slurEnd = (src.NoteSlurs ?? []).some((sl: any) => sl?.EndNote === src);
+            const tie = src.NoteTie;
+            const tieContinuation = !!tie && tie.StartNote !== src;
+
             notes.push({
               id,
               midi,
@@ -142,6 +161,12 @@ export function parseSheetToNotes(osmd: OpenSheetMusicDisplay, bpm = 90): ParseR
               startSec,
               durationSec,
               hand,
+              measure: src.SourceMeasure?.MeasureNumber ?? 0,
+              durationName: durationNameFromWhole(typeLen && typeLen > 0 ? typeLen : length),
+              spelledName: spellPitch(pitch, midi),
+              slurEnd,
+              tieContinuation,
+              system: gMeasure.ParentStaffLine?.ParentMusicSystem?.Id ?? 0,
               svgEls,
               accidentalEls,
             });
@@ -152,5 +177,6 @@ export function parseSheetToNotes(osmd: OpenSheetMusicDisplay, bpm = 90): ParseR
   }
 
   notes.sort((a, b) => a.startSec - b.startSec);
+  markPhrases(notes);
   return { notes, bpm, durationSec: maxEnd };
 }

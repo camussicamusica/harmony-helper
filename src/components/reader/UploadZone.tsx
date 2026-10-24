@@ -1,13 +1,13 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { FileUp, Loader2 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { convertToMusicXml, type OmrProgress } from "@/lib/music/omrService";
-import { cn } from "@/lib/utils";
 
 interface Props {
   onScoreLoaded: (musicXml: string, filename: string) => void;
 }
 
+/** Toolbar button "Abrir partitura" + drag-and-drop anywhere on the page. */
 export function UploadZone({ onScoreLoaded }: Props) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -15,6 +15,8 @@ export function UploadZone({ onScoreLoaded }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   const busy = progress !== null && progress.stage !== "done" && progress.stage !== "error";
+  const busyRef = useRef(busy);
+  busyRef.current = busy;
 
   const handleFile = useCallback(
     async (file: File) => {
@@ -25,30 +27,60 @@ export function UploadZone({ onScoreLoaded }: Props) {
         // brief "done" flash, then clear
         setTimeout(() => setProgress(null), 600);
       } catch (e: any) {
-        setError(e?.message ?? "Failed to process file");
+        setError(e?.message ?? "No se pudo procesar el archivo");
         setProgress({ stage: "error", percent: 0 });
       }
     },
     [onScoreLoaded],
   );
 
-  const onDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(false);
-    if (busy) return;
-    const f = e.dataTransfer.files?.[0];
-    if (f) void handleFile(f);
-  };
+  // Drag and drop anywhere on the page.
+  useEffect(() => {
+    let depth = 0;
+    const hasFiles = (e: DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes("Files");
+    const onEnter = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      depth++;
+      if (!busyRef.current) setDragOver(true);
+    };
+    const onOver = (e: DragEvent) => {
+      if (hasFiles(e)) e.preventDefault();
+    };
+    const onLeave = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      depth = Math.max(0, depth - 1);
+      if (depth === 0) setDragOver(false);
+    };
+    const onDrop = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      depth = 0;
+      setDragOver(false);
+      if (busyRef.current) return;
+      const f = e.dataTransfer?.files?.[0];
+      if (f) void handleFile(f);
+    };
+    window.addEventListener("dragenter", onEnter);
+    window.addEventListener("dragover", onOver);
+    window.addEventListener("dragleave", onLeave);
+    window.addEventListener("drop", onDrop);
+    return () => {
+      window.removeEventListener("dragenter", onEnter);
+      window.removeEventListener("dragover", onOver);
+      window.removeEventListener("dragleave", onLeave);
+      window.removeEventListener("drop", onDrop);
+    };
+  }, [handleFile]);
 
   const stageLabel = (() => {
     if (!progress) return null;
     switch (progress.stage) {
       case "uploading":
-        return "Uploading…";
+        return "Subiendo…";
       case "processing":
-        return "Processing…";
+        return "Procesando…";
       case "done":
-        return "Ready";
+        return "Listo";
       case "error":
         return "Error";
       default:
@@ -57,53 +89,35 @@ export function UploadZone({ onScoreLoaded }: Props) {
   })();
 
   return (
-    <div className="border-b border-border bg-card/40 px-6 py-3">
-      <div
-        onDragOver={(e) => {
-          e.preventDefault();
-          if (!busy) setDragOver(true);
-        }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={onDrop}
-        onClick={() => !busy && inputRef.current?.click()}
-        className={cn(
-          "group flex cursor-pointer items-center gap-4 rounded-lg border border-dashed px-4 py-3 transition-colors",
-          dragOver ? "border-primary bg-primary/5" : "border-border hover:border-foreground/40",
-          busy && "cursor-wait opacity-90",
-        )}
-        role="button"
-        aria-label="Upload score"
-      >
-        <div className="flex h-9 w-9 items-center justify-center rounded-md bg-background">
+    <>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => inputRef.current?.click()}
+          className="inline-flex items-center gap-2 rounded-md border border-border bg-background px-3 py-1.5 text-xs hover:bg-accent disabled:cursor-wait disabled:opacity-80"
+        >
           {busy ? (
-            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
           ) : (
-            <FileUp className="h-4 w-4 text-muted-foreground group-hover:text-foreground" />
+            <FileUp className="h-3.5 w-3.5" />
           )}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="text-sm font-medium">
-            Upload Score{" "}
-            <span className="text-xs font-normal text-muted-foreground">(PDF, XML, MIDI)</span>
+          Abrir partitura
+        </button>
+        {busy && (
+          <div className="flex w-32 flex-col gap-1">
+            <span className="truncate text-[11px] italic text-foreground">
+              {stageLabel}
+              {progress?.message ? ` — ${progress.message}` : ""}
+            </span>
+            <Progress value={progress?.percent ?? 0} className="h-1" />
           </div>
-          <div className="mt-0.5 text-xs text-muted-foreground">
-            {busy ? (
-              <span className="italic text-foreground">
-                {stageLabel}
-                {progress?.message ? ` — ${progress.message}` : ""}
-              </span>
-            ) : error ? (
-              <span className="italic text-destructive">{error}</span>
-            ) : (
-              <span>Drag &amp; drop a file here, or click to browse.</span>
-            )}
-          </div>
-          {busy && (
-            <div className="mt-2">
-              <Progress value={progress?.percent ?? 0} className="h-1" />
-            </div>
-          )}
-        </div>
+        )}
+        {!busy && error && (
+          <span className="max-w-48 truncate text-[11px] italic text-destructive" title={error}>
+            {error}
+          </span>
+        )}
         <input
           ref={inputRef}
           type="file"
@@ -116,6 +130,13 @@ export function UploadZone({ onScoreLoaded }: Props) {
           }}
         />
       </div>
-    </div>
+      {dragOver && (
+        <div className="pointer-events-none fixed inset-0 z-[100] flex items-center justify-center border-4 border-dashed border-primary bg-primary/10">
+          <div className="rounded-lg bg-card px-6 py-4 text-sm font-medium shadow-lg">
+            Soltá la partitura acá (PDF, XML, MIDI)
+          </div>
+        </div>
+      )}
+    </>
   );
 }

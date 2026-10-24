@@ -175,11 +175,3 @@
   fill: var(--note-color, currentColor) !important;
   filter: drop-shadow(0 0 3px var(--note-color, currentColor));
 }
-
-/* Melodic-contour overlay */
-.score-root .contour-RH {
-  color: var(--color-foreground);
-}
-.score-root .contour-LH {
-  color: var(--color-muted-foreground);
-}

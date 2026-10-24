@@ -183,3 +183,12 @@ export function stop() {
 export function setBpm(bpm: number) {
   Tone.getTransport().bpm.value = bpm;
 }
+
+/** Current playback position in seconds (Transport time), 0 when stopped. */
+export function getPlaybackSeconds(): number {
+  try {
+    return Tone.getTransport().seconds;
+  } catch {
+    return 0;
+  }
+}
