@@ -14,7 +14,7 @@ Grammar: NOTES = circles (rings) and stems. INTERVALS = the line plus a filled p
 - Intervalos: segment in the interval role color, 3.5px, label in a filled pill (black or white text by contrast). Rings are neutral dark grey (`RING_NEUTRAL_COLOR`).
 - Ambos: same segments and pills, rings keep note colors.
 - Interval = simple interval, semitones mod 12; 12 -> P8; 0 -> unison (`interval-P1`, neutral grey, new built-in role).
-- The old label switch is renamed "Etiquetas" and only works in Notas; in Intervalos/Ambos pills always show.
+- Update 2026-10-24 (Sofia: "aparezcan solamente cuando pongo el mouse"): interval pills and note labels are hidden by default and appear on hover over the segment (invisible 14px hit stroke). The switch "Etiquetas siempre" (localStorage `hh.alwaysLabels.v1`) brings back always-on labels.
 - Stems are drawn by OSMD and keep note colors in every mode.
 
 ## Legend

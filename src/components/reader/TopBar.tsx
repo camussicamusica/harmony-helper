@@ -7,7 +7,8 @@ import { NoteColorStrip } from "./NoteColorStrip";
 import { IntervalStrip } from "./IntervalStrip";
 import { LINE_MODES, type LineColorMode } from "@/lib/music/lineMode";
 import { UploadZone } from "./UploadZone";
-import { Keyboard, Minus, Pause, Play, Plus, Square } from "lucide-react";
+import { useLayersOpen } from "@/lib/music/analysis/useFicha";
+import { ChevronDown, Keyboard, Layers, ListMusic, Minus, Pause, Play, Plus, Square } from "lucide-react";
 
 interface Props {
   isPlaying: boolean;
@@ -19,6 +20,8 @@ interface Props {
   intervals: boolean;
   lineMode: LineColorMode;
   showKeyboard: boolean;
+  fichaOpen: boolean;
+  onFichaToggle: () => void;
   onPlay: () => void;
   onPause: () => void;
   onStop: () => void;
@@ -43,6 +46,8 @@ export function TopBar({
   intervals,
   lineMode,
   showKeyboard,
+  fichaOpen,
+  onFichaToggle,
   onPlay,
   onPause,
   onStop,
@@ -56,6 +61,7 @@ export function TopBar({
   onShowKeyboardChange,
   onScoreLoaded,
 }: Props) {
+  const [layersOpen, setLayersOpen] = useLayersOpen();
   const isoLabel: Record<IsolationMode, string> = {
     both: "Both Hands",
     rh: "Right Hand",
@@ -144,6 +150,15 @@ export function TopBar({
 
       <div className="ml-auto flex items-center gap-2">
         <UploadZone onScoreLoaded={onScoreLoaded} />
+        <Button
+          size="sm"
+          variant={fichaOpen ? "secondary" : "outline"}
+          className="gap-1"
+          aria-pressed={fichaOpen}
+          onClick={onFichaToggle}
+        >
+          <ListMusic className="h-4 w-4" /> Ficha
+        </Button>
         <ColorStudio />
       </div>
 
@@ -188,6 +203,36 @@ export function TopBar({
           <span className={line ? "italic text-foreground" : ""}>Línea melódica</span>
         </label>
 
+        {view === "estudiar" && (
+          <Button
+            size="sm"
+            variant={showKeyboard ? "secondary" : "ghost"}
+            className="h-7 gap-1 px-2 text-xs"
+            onClick={() => onShowKeyboardChange(!showKeyboard)}
+          >
+            <Keyboard className="h-3.5 w-3.5" />
+            {showKeyboard ? "Ocultar teclado" : "Mostrar teclado"}
+          </Button>
+        )}
+
+        <NoteColorStrip />
+
+        <Button
+          size="sm"
+          variant={layersOpen ? "secondary" : "ghost"}
+          className="h-7 gap-1 px-2 text-xs"
+          aria-expanded={layersOpen}
+          onClick={() => setLayersOpen(!layersOpen)}
+          title="Color de la línea, etiquetas y saltos"
+        >
+          <Layers className="h-3.5 w-3.5" /> Capas
+          <ChevronDown className={`h-3 w-3 transition-transform ${layersOpen ? "rotate-180" : ""}`} />
+        </Button>
+      </div>
+
+      {/* third row: layers (closed by default) */}
+      {layersOpen && (
+        <div className="flex basis-full flex-wrap items-center gap-x-4 gap-y-1.5">
         {line && (
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <span>Color de la línea:</span>
@@ -219,22 +264,12 @@ export function TopBar({
           <Switch checked={intervals} disabled={!line} onCheckedChange={onIntervalsChange} />
           <span className={intervals && line ? "italic text-foreground" : ""}>Etiquetas siempre</span>
         </label>
-
-        {view === "estudiar" && (
-          <Button
-            size="sm"
-            variant={showKeyboard ? "secondary" : "ghost"}
-            className="h-7 gap-1 px-2 text-xs"
-            onClick={() => onShowKeyboardChange(!showKeyboard)}
-          >
-            <Keyboard className="h-3.5 w-3.5" />
-            {showKeyboard ? "Ocultar teclado" : "Mostrar teclado"}
-          </Button>
-        )}
-
-        <NoteColorStrip />
-        {line && lineMode !== "notas" && <IntervalStrip />}
-      </div>
+          {line && lineMode !== "notas" && <IntervalStrip />}
+          {!line && (
+            <span className="text-xs italic text-muted-foreground">Prendé la línea melódica para usar estas opciones.</span>
+          )}
+        </div>
+      )}
     </header>
   );
 }

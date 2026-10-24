@@ -1,7 +1,16 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { TopBar } from "./TopBar";
 import { ScoreView } from "./ScoreView";
 import { PianoView } from "./PianoView";
+import { FichaPanel } from "@/components/analysis/FichaPanel";
+import {
+  highlightedIndices,
+  useChordOverlayPref,
+  useFicha,
+  type ChordHighlight,
+  type ScoreData,
+} from "@/lib/music/analysis/useFicha";
+import type { ScoreMeta } from "@/lib/music/analysis/scoreMeta";
 import { SAMPLE_MUSICXML } from "@/lib/music/sampleScore";
 import {
   clearSchedule,
@@ -30,6 +39,18 @@ export function ReaderPage() {
   const [viewReady, setViewReady] = useState(false);
   const [showKeyboard, setShowKeyboard] = useState(false);
   const [scoreVersion, setScoreVersion] = useState(0);
+
+  const [fichaOpen, setFichaOpen] = useState(false);
+  const [scoreData, setScoreData] = useState<ScoreData | null>(null);
+  const [showChordMarks, setShowChordMarks] = useChordOverlayPref();
+  const [highlight, setHighlight] = useState<ChordHighlight>(null);
+  const [focusChord, setFocusChord] = useState<{ index: number; nonce: number } | null>(null);
+  const ficha = useFicha(xml, scoreData, bpm, fichaOpen || showChordMarks);
+  const highlightIdx = useMemo(() => highlightedIndices(highlight, ficha.chords), [highlight, ficha.chords]);
+
+  const handleScoreData = useCallback((notes: ScheduledNote[], meta: ScoreMeta) => {
+    setScoreData({ notes, meta });
+  }, []);
 
   const handleNotes = useCallback((notes: ScheduledNote[]) => {
     void loadNotes(notes);
@@ -88,6 +109,9 @@ export function ReaderPage() {
   const handleScoreLoaded = (musicXml: string, _filename: string) => {
     handleStop();
     setXml(musicXml);
+    setScoreData(null);
+    setHighlight(null);
+    setFocusChord(null);
     setScoreVersion((v) => v + 1);
   };
 
@@ -112,6 +136,8 @@ export function ReaderPage() {
         intervals={intervals}
         lineMode={lineMode}
         showKeyboard={showKeyboard}
+        fichaOpen={fichaOpen}
+        onFichaToggle={() => setFichaOpen((v) => !v)}
         onPlay={handlePlay}
         onPause={handlePause}
         onStop={handleStop}
@@ -140,6 +166,11 @@ export function ReaderPage() {
               lineMode={lineMode}
               isPlaying={isPlaying}
               onNotes={handleNotes}
+              onScoreData={handleScoreData}
+              chordMarks={ficha.chords}
+              showChordMarks={showChordMarks}
+              highlightChords={highlightIdx}
+              focusChord={focusChord}
             />
           )}
         </section>
@@ -153,6 +184,16 @@ export function ReaderPage() {
           </section>
         )}
       </main>
+      <FichaPanel
+        open={fichaOpen}
+        onOpenChange={setFichaOpen}
+        ficha={ficha}
+        showChordMarks={showChordMarks}
+        onShowChordMarksChange={setShowChordMarks}
+        highlight={highlight}
+        onHighlightChange={setHighlight}
+        onFocusChord={(index) => setFocusChord({ index, nonce: Date.now() })}
+      />
     </div>
   );
 }

@@ -175,3 +175,10 @@
   fill: var(--note-color, currentColor) !important;
   filter: drop-shadow(0 0 3px var(--note-color, currentColor));
 }
+
+/* Chord highlight (Ficha): outline the noteheads of the lit chords. */
+.score-root [data-note-id].chord-hl .vf-notehead path {
+  stroke: #111827;
+  stroke-width: 1.6px;
+  paint-order: stroke;
+}

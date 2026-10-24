@@ -16,6 +16,9 @@ import {
 import { readableTextOn } from "@/lib/colors/color";
 import type { LineColorMode } from "@/lib/music/lineMode";
 import { IntervalLegend } from "./IntervalLegend";
+import { readScoreMeta, type ScoreMeta } from "@/lib/music/analysis/scoreMeta";
+import type { PieceChord } from "@/lib/music/analysis/pieceChords";
+import { getRole } from "@/lib/colors/store";
 import { intervalRole, intervalSignature, noteSignature, noteTargetOn, subscribe as subscribeColors } from "@/lib/colors/store";
 import type { Hand, IsolationMode, ScheduledNote, ScoreView as ViewMode } from "@/lib/music/types";
 
@@ -37,6 +40,15 @@ interface Props {
   lineMode: LineColorMode;
   isPlaying: boolean;
   onNotes: (notes: ScheduledNote[]) => void;
+  /** Notes plus key/time/measure info for the Ficha analysis. */
+  onScoreData?: (notes: ScheduledNote[], meta: ScoreMeta) => void;
+  /** Chords of the piece, drawn above the staff when `showChordMarks`. */
+  chordMarks?: PieceChord[];
+  showChordMarks?: boolean;
+  /** Indices into `chordMarks` to light up. */
+  highlightChords?: number[];
+  /** Scroll the score to this chord (nonce makes repeated requests work). */
+  focusChord?: { index: number; nonce: number } | null;
 }
 
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -71,11 +83,17 @@ export function ScoreView({
   lineMode,
   isPlaying,
   onNotes,
+  onScoreData,
+  chordMarks = [],
+  showChordMarks = false,
+  highlightChords = [],
+  focusChord = null,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const overlayRef = useRef<SVGSVGElement | null>(null);
+  const chordSvgRef = useRef<SVGSVGElement | null>(null);
   const osmdRef = useRef<any>(null);
   const readyRef = useRef(false);
   const cleanupRef = useRef<Array<() => void>>([]);
@@ -96,6 +114,16 @@ export function ScoreView({
   zoomRef.current = zoom;
   const viewRef = useRef(view);
   viewRef.current = view;
+  const onScoreDataRef = useRef(onScoreData);
+  onScoreDataRef.current = onScoreData;
+  const chordMarksRef = useRef(chordMarks);
+  chordMarksRef.current = chordMarks;
+  const showChordMarksRef = useRef(showChordMarks);
+  showChordMarksRef.current = showChordMarks;
+  const highlightRef = useRef(highlightChords);
+  highlightRef.current = highlightChords;
+  /** Top staff line (px, relative to the wrapper) of each system id. */
+  const systemTopRef = useRef<Map<number, number>>(new Map());
   const fitRef = useRef(1);
   const timeMapRef = useRef<Array<{ t: number; x: number }>>([]);
   const holdUntilRef = useRef(0);
@@ -199,6 +227,100 @@ export function ScoreView({
       if (endT > last.t) map.push({ t: endT, x: last.x + 40 });
     }
     timeMapRef.current = map;
+
+    // Top staff line of each system: first group of 5 flat staff-line paths of every system's top staff.
+    const tops: number[] = [];
+    containerRef.current?.querySelectorAll(".staffline").forEach((g) => {
+      const ys = Array.from(g.querySelectorAll("path"))
+        .map((p) => p.getBoundingClientRect())
+        .filter((r) => r.height < 1 && r.width > 0)
+        .map((r) => r.top - wr.top);
+      if (ys.length) tops.push(Math.min(...ys));
+    });
+    tops.sort((a, b) => a - b);
+    const sysIds = [...new Set(notes.map((n) => n.system ?? 0))].sort((a, b) => a - b);
+    const m = new Map<number, number>();
+    if (sysIds.length && tops.length && tops.length % sysIds.length === 0) {
+      const per = tops.length / sysIds.length;
+      sysIds.forEach((id, i) => m.set(id, tops[i * per]));
+    }
+    systemTopRef.current = m;
+  };
+
+  /** Where a chord mark sits: x over its first notes, y above the top staff of that system. */
+  const chordPosition = (chord: PieceChord): { x: number; y: number } | null => {
+    const byId = new Map(notesRef.current.map((n) => [n.id, n]));
+    const ns = chord.noteIds.map((id) => byId.get(id)).filter((n): n is ScheduledNote => !!n && n.cx !== undefined);
+    if (!ns.length) return null;
+    const t0 = Math.min(...ns.map((n) => n.startSec));
+    const first = ns.filter((n) => Math.abs(n.startSec - t0) < 1e-3);
+    const x = first.reduce((a, n) => a + n.cx!, 0) / first.length;
+    const sys = first[0].system ?? 0;
+    const top = systemTopRef.current.get(sys);
+    const ys = ns.filter((n) => (n.system ?? 0) === sys).map((n) => n.cy!);
+    const y = (top !== undefined ? Math.min(top, Math.min(...ys) - 8) : Math.min(...ys) - 30) - 24;
+    return { x, y };
+  };
+
+  /** "Acordes sobre la partitura": a small circle above the top staff at each chord change. */
+  const drawChords = () => {
+    const svg = chordSvgRef.current;
+    const wrap = wrapRef.current;
+    if (!svg || !wrap) return;
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    svg.setAttribute("width", String(wrap.offsetWidth));
+    svg.setAttribute("height", String(wrap.offsetHeight));
+    // Clear notehead highlights; re-apply below.
+    for (const n of notesRef.current) n.svgEls?.forEach((el) => el.classList.remove("chord-hl"));
+    const marks = chordMarksRef.current;
+    const hl = new Set(highlightRef.current);
+    const hasHl = hl.size > 0;
+    if (hasHl) {
+      const byId = new Map(notesRef.current.map((n) => [n.id, n]));
+      for (const i of hl) {
+        for (const id of marks[i]?.noteIds ?? []) byId.get(id)?.svgEls?.forEach((el) => el.classList.add("chord-hl"));
+      }
+    }
+    if (!showChordMarksRef.current) return;
+    const outsideColor = getRole("chord-outsideScale")?.color ?? "#78716C";
+    marks.forEach((chord, i) => {
+      const pos = chordPosition(chord);
+      if (!pos) return;
+      const color = getRole(chord.roleId)?.color ?? outsideColor;
+      const label = chord.inScale ? chord.roman! : chord.rootEs;
+      const r = Math.max(11, 4.5 + label.length * 2.9);
+      const lit = hl.has(i);
+      const g = svgEl("g", { opacity: hasHl && !lit ? 0.3 : 1 });
+      if (lit) {
+        const pulse = svgEl("circle", { cx: pos.x, cy: pos.y, r, fill: "none", stroke: color, "stroke-width": 2, opacity: 0.6 });
+        pulse.appendChild(svgEl("animate", { attributeName: "r", values: `${r};${r + 9};${r}`, dur: "1.4s", repeatCount: "indefinite" }));
+        pulse.appendChild(svgEl("animate", { attributeName: "opacity", values: "0.7;0;0.7", dur: "1.4s", repeatCount: "indefinite" }));
+        g.appendChild(pulse);
+      }
+      g.appendChild(
+        svgEl("circle", {
+          cx: pos.x,
+          cy: pos.y,
+          r,
+          fill: "#ffffff",
+          "fill-opacity": 0.92,
+          stroke: color,
+          "stroke-width": lit ? 3.5 : 2,
+          ...(chord.inScale ? {} : { "stroke-dasharray": "4 3" }),
+        }),
+      );
+      const t = svgEl("text", {
+        x: pos.x,
+        y: pos.y + 3.6,
+        "text-anchor": "middle",
+        "font-size": 10.5,
+        "font-weight": 700,
+        fill: "#111827",
+      });
+      t.textContent = label;
+      g.appendChild(t);
+      svg.appendChild(g);
+    });
   };
 
   const xAt = (t: number): number | null => {
@@ -410,6 +532,7 @@ export function ScoreView({
   const relayout = () => {
     measure(notesRef.current);
     drawLine();
+    drawChords();
   };
 
   /** Render OSMD. In Tocar the zoom is fitted to the band height (zoom slider multiplies on top). */
@@ -473,7 +596,13 @@ export function ScoreView({
     }
 
     drawLine();
+    drawChords();
     notesOut(notes);
+    try {
+      onScoreDataRef.current?.(notes, readScoreMeta(osmd, bpmRef.current));
+    } catch {
+      /* ignore */
+    }
   };
 
   // Initial load / xml / view change — recreate OSMD.
@@ -606,6 +735,7 @@ export function ScoreView({
     let lastIntSig = intervalSignature();
     let timer: ReturnType<typeof setTimeout> | null = null;
     const unsub = subscribeColors(() => {
+      drawChords(); // chord role colors may have changed
       const sig = noteSignature();
       const intSig = intervalSignature();
       if (intSig !== lastIntSig) {
@@ -645,6 +775,8 @@ export function ScoreView({
       notesRef.current = notes;
       measure(notes);
       onNotesRef.current(notes);
+      onScoreDataRef.current?.(notes, readScoreMeta(osmd, bpm));
+      drawChords();
     } catch (e) {
       console.error("BPM recompute failed:", e);
     }
@@ -658,6 +790,31 @@ export function ScoreView({
     drawLine();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [line, intervals, isolation, lineMode]);
+
+  // Chord marks / highlight — redraw the chord overlay.
+  useEffect(() => {
+    drawChords();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chordMarks, showChordMarks, highlightChords]);
+
+  // Scroll the score to a chord (Estudiar: page scroll; Tocar: band scroll under the "now" line).
+  useEffect(() => {
+    if (!focusChord) return;
+    const chord = chordMarksRef.current[focusChord.index];
+    const sc = scrollRef.current;
+    const wrap = wrapRef.current;
+    if (!chord || !sc || !wrap) return;
+    const pos = chordPosition(chord);
+    if (!pos) return;
+    if (viewRef.current === "tocar") {
+      holdUntilRef.current = performance.now() + 2500;
+      sc.scrollTo({ left: Math.max(0, pos.x - NOW_LINE_FRACTION * sc.clientWidth), behavior: "smooth" });
+    } else {
+      const top = wrap.getBoundingClientRect().top + window.scrollY + pos.y - 150;
+      window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusChord]);
 
   // Tocar auto-scroll: keep the playback position under the fixed "now" line.
   useEffect(() => {
@@ -755,6 +912,7 @@ export function ScoreView({
             style={tocar ? { flex: "none", minWidth: 200 } : { width: "100%" }}
           />
           <svg ref={overlayRef} className="pointer-events-none absolute left-0 top-0" />
+          <svg ref={chordSvgRef} className="pointer-events-none absolute left-0 top-0" />
         </div>
       </div>
 
