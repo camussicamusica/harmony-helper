@@ -89,3 +89,14 @@ export function similarPairs(roles: ColorRole[], threshold = 0.12): SimilarPair[
   }
   return out;
 }
+
+/** Black or white text, whichever reads better on this fill (WCAG relative luminance). */
+export function readableTextOn(hex: string, dark = "#111111", light = "#ffffff"): string {
+  const h = normalizeHex(hex) ?? "#808080";
+  const ch = [1, 3, 5].map((i) => {
+    const v = parseInt(h.slice(i, i + 2), 16) / 255;
+    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+  });
+  const L = 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2];
+  return L > 0.4 ? dark : light;
+}

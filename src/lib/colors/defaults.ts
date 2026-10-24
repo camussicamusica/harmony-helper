@@ -65,16 +65,53 @@ function buildChords(): ColorRole[] {
   return spec.map(([id, name, c]) => role(`chord-${id}`, "chords", name, c, [...CHORD_TARGETS]));
 }
 
+/** Interval role ids in order of size. P1 (unison) is a neutral grey, not toggled in the strip. */
+export const INTERVAL_IDS = ["m2", "M2", "m3", "M3", "P4", "TT", "P5", "m6", "M6", "m7", "M7", "P8"] as const;
+
+/** Default interval colors (hers to repaint). Index = semitones (mod 12, 0 = octave) in INTERVAL_IDS order + P1. */
+export const INTERVAL_DEFAULTS: Record<string, string> = {
+  P1: "#9CA3AF", // neutral grey
+  m2: "#7B1E3A", // wine
+  M2: "#E4572E", // vermilion
+  m3: "#F2A33A", // amber
+  M3: "#D4B106", // gold
+  P4: "#7CB342", // green
+  TT: "#00897B", // teal
+  P5: "#1E88E5", // blue
+  m6: "#3949AB", // indigo
+  M6: "#8E24AA", // purple
+  m7: "#EC407A", // pink
+  M7: "#795548", // brown
+  P8: "#00ACC1", // cyan
+};
+
+/** The old grey placeholders (210 - 12*i). Used only to migrate stored roles that were never repainted. */
+export const OLD_INTERVAL_GREYS: Record<string, string> = Object.fromEntries(
+  INTERVAL_IDS.map((id, i) => {
+    const g = Math.round(210 - i * 12).toString(16).padStart(2, "0");
+    return [`interval-${id}`, `#${g}${g}${g}`];
+  }),
+);
+
+/** Neutral dark grey for note rings in "Intervalos" mode (only intervals carry color). */
+export const RING_NEUTRAL_COLOR = "#4b5563";
+/** White halo under the line so it reads over staff lines. */
+export const HALO_COLOR = "#ffffff";
+/** Thin segment for a switched-off interval. */
+export const DISABLED_SEGMENT_COLOR = "#d1d5db";
+/** Pill label text, chosen by contrast. */
+export const PILL_TEXT_DARK = "#111111";
+export const PILL_TEXT_LIGHT = "#ffffff";
+
 function buildIntervals(): ColorRole[] {
-  const spec: [string, string][] = [
-    ["m2", "Minor 2nd"], ["M2", "Major 2nd"], ["m3", "Minor 3rd"], ["M3", "Major 3rd"],
-    ["P4", "Perfect 4th"], ["TT", "Tritone"], ["P5", "Perfect 5th"], ["m6", "Minor 6th"],
-    ["M6", "Major 6th"], ["m7", "Minor 7th"], ["M7", "Major 7th"], ["P8", "Octave"],
-  ];
-  return spec.map(([id, name], i) => {
-    const grey = Math.round(210 - i * 12).toString(16).padStart(2, "0");
-    return role(`interval-${id}`, "intervals", name, `#${grey}${grey}${grey}`, ["band", "square"]);
-  });
+  const names: Record<string, string> = {
+    P1: "Unison", m2: "Minor 2nd", M2: "Major 2nd", m3: "Minor 3rd", M3: "Major 3rd",
+    P4: "Perfect 4th", TT: "Tritone", P5: "Perfect 5th", m6: "Minor 6th",
+    M6: "Major 6th", m7: "Minor 7th", M7: "Major 7th", P8: "Octave",
+  };
+  return ["P1", ...INTERVAL_IDS].map((id) =>
+    role(`interval-${id}`, "intervals", names[id], INTERVAL_DEFAULTS[id], ["band", "square"]),
+  );
 }
 
 function buildPatterns(): ColorRole[] {

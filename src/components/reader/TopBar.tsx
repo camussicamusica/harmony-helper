@@ -4,6 +4,8 @@ import { Switch } from "@/components/ui/switch";
 import type { IsolationMode, ScoreView } from "@/lib/music/types";
 import { ColorStudio } from "@/components/studio/ColorStudio";
 import { NoteColorStrip } from "./NoteColorStrip";
+import { IntervalStrip } from "./IntervalStrip";
+import { LINE_MODES, type LineColorMode } from "@/lib/music/lineMode";
 import { UploadZone } from "./UploadZone";
 import { Keyboard, Minus, Pause, Play, Plus, Square } from "lucide-react";
 
@@ -15,6 +17,7 @@ interface Props {
   view: ScoreView;
   line: boolean;
   intervals: boolean;
+  lineMode: LineColorMode;
   showKeyboard: boolean;
   onPlay: () => void;
   onPause: () => void;
@@ -25,6 +28,7 @@ interface Props {
   onViewChange: (v: ScoreView) => void;
   onLineChange: (v: boolean) => void;
   onIntervalsChange: (v: boolean) => void;
+  onLineModeChange: (m: LineColorMode) => void;
   onShowKeyboardChange: (v: boolean) => void;
   onScoreLoaded: (musicXml: string, filename: string) => void;
 }
@@ -37,6 +41,7 @@ export function TopBar({
   view,
   line,
   intervals,
+  lineMode,
   showKeyboard,
   onPlay,
   onPause,
@@ -47,6 +52,7 @@ export function TopBar({
   onViewChange,
   onLineChange,
   onIntervalsChange,
+  onLineModeChange,
   onShowKeyboardChange,
   onScoreLoaded,
 }: Props) {
@@ -182,13 +188,40 @@ export function TopBar({
           <span className={line ? "italic text-foreground" : ""}>Línea melódica</span>
         </label>
 
+        {line && (
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span>Color de la línea:</span>
+            <div className="flex items-center gap-0.5 rounded-md border border-border p-0.5">
+              {LINE_MODES.map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => onLineModeChange(m.id)}
+                  aria-pressed={lineMode === m.id}
+                  className={`rounded px-2 py-0.5 text-xs ${
+                    lineMode === m.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* In Intervalos / Ambos the labels always show as pills, so this switch only matters in Notas. */}
         <label
+          title={lineMode !== "notas" ? "En Intervalos y Ambos las etiquetas siempre se muestran" : undefined}
           className={`flex items-center gap-2 text-xs text-muted-foreground ${
-            line ? "cursor-pointer" : "cursor-not-allowed opacity-50"
+            line && lineMode === "notas" ? "cursor-pointer" : "cursor-not-allowed opacity-50"
           }`}
         >
-          <Switch checked={intervals} disabled={!line} onCheckedChange={onIntervalsChange} />
-          <span className={intervals && line ? "italic text-foreground" : ""}>Intervalos</span>
+          <Switch
+            checked={lineMode !== "notas" || intervals}
+            disabled={!line || lineMode !== "notas"}
+            onCheckedChange={onIntervalsChange}
+          />
+          <span className={intervals && line ? "italic text-foreground" : ""}>Etiquetas</span>
         </label>
 
         {view === "estudiar" && (
@@ -204,6 +237,7 @@ export function TopBar({
         )}
 
         <NoteColorStrip />
+        {line && lineMode !== "notas" && <IntervalStrip />}
       </div>
     </header>
   );

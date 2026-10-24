@@ -85,6 +85,21 @@ export function intervalLabel(fromMidi: number, toMidi: number): string {
   return INTERVALS[d % 12];
 }
 
+const INTERVAL_ROLE_IDS = ["P8", "m2", "M2", "m3", "M3", "P4", "TT", "P5", "m6", "M6", "m7", "M7"];
+
+/** Simple-interval role key ("P1", "m2" … "P8"): semitones mod 12, 12 -> P8, 0 -> unison. */
+export function intervalKey(fromMidi: number, toMidi: number): string {
+  const d = Math.abs(toMidi - fromMidi);
+  if (d === 0) return "P1";
+  return INTERVAL_ROLE_IDS[d % 12];
+}
+
+/** Spanish label for each interval role key. */
+export const INTERVAL_KEY_LABEL: Record<string, string> = {
+  P1: "unísono", m2: "2ª m", M2: "2ª M", m3: "3ª m", M3: "3ª M", P4: "4ª J",
+  TT: "tritono", P5: "5ª J", m6: "6ª m", M6: "6ª M", m7: "7ª m", M7: "7ª M", P8: "8ª",
+};
+
 const QUALITY_ES: Record<string, string> = {
   major: "mayor",
   minor: "menor",

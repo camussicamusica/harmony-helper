@@ -11,6 +11,7 @@ import {
   setIsolation,
   stop,
 } from "@/lib/music/scheduler";
+import { useLineMode } from "@/lib/music/lineMode";
 import { applyInterfaceVars } from "@/lib/colors/store";
 import type { IsolationMode, ScheduledNote, ScoreView as ViewMode } from "@/lib/music/types";
 
@@ -24,6 +25,7 @@ export function ReaderPage() {
   const [zoom, setZoom] = useState(1);
   const [line, setLine] = useState(false);
   const [intervals, setIntervals] = useState(false);
+  const [lineMode, setLineMode] = useLineMode();
   const [view, setViewState] = useState<ViewMode>("tocar");
   const [viewReady, setViewReady] = useState(false);
   const [showKeyboard, setShowKeyboard] = useState(false);
@@ -108,6 +110,7 @@ export function ReaderPage() {
         view={view}
         line={line}
         intervals={intervals}
+        lineMode={lineMode}
         showKeyboard={showKeyboard}
         onPlay={handlePlay}
         onPause={handlePause}
@@ -118,6 +121,7 @@ export function ReaderPage() {
         onViewChange={setView}
         onLineChange={setLine}
         onIntervalsChange={setIntervals}
+        onLineModeChange={setLineMode}
         onShowKeyboardChange={setShowKeyboard}
         onScoreLoaded={handleScoreLoaded}
       />
@@ -133,6 +137,7 @@ export function ReaderPage() {
               view={view}
               line={line}
               intervals={intervals}
+              lineMode={lineMode}
               isPlaying={isPlaying}
               onNotes={handleNotes}
             />

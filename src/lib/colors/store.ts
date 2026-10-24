@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { normalizeHex } from "./color";
-import { buildDefaultRoles, PLAIN_COLOR } from "./defaults";
+import { buildDefaultRoles, OLD_INTERVAL_GREYS, PLAIN_COLOR } from "./defaults";
 import { PRESETS } from "./presets";
 import type { ColorGroup, ColorRole, ColorTarget, Palette } from "./types";
 
@@ -31,6 +31,9 @@ function mergeDefaults(p: Palette): Palette {
       // keep structural defaults (cssVars) current without touching her values
       const r = roles.find((x) => x.id === d.id)!;
       if (d.cssVars && !r.cssVars) r.cssVars = d.cssVars;
+      // migrate interval roles still holding the old placeholder grey (never repainted by her)
+      const old = OLD_INTERVAL_GREYS[d.id];
+      if (old && r.color.toLowerCase() === old.toLowerCase()) r.color = d.color;
     }
   }
   return { ...p, roles, swatches: Array.isArray(p.swatches) ? p.swatches : [] };
@@ -186,6 +189,31 @@ export function noteSignature(): string {
     .roles.filter((r) => r.group === "notes")
     .map((r) => `${r.id}:${r.color}:${r.enabled !== false ? 1 : 0}:${r.targets.join(",")}`)
     .join("|");
+}
+
+/** Role for a simple interval id ("m2" … "P8", "P1"). */
+export function intervalRole(id: string): ColorRole | undefined {
+  return getRole(`interval-${id}`);
+}
+
+/** Changes whenever anything that affects painted intervals changes. */
+export function intervalSignature(): string {
+  return currentPalette()
+    .roles.filter((r) => r.group === "intervals")
+    .map((r) => `${r.id}:${r.color}:${r.enabled !== false ? 1 : 0}`)
+    .join("|");
+}
+
+/** Switch interval roles (not the unison) on or off. `only` keeps just those ids on. */
+export function setIntervalsEnabled(enabled: boolean, only?: string) {
+  updateCurrent((p) => ({
+    ...p,
+    roles: p.roles.map((r) =>
+      r.group === "intervals" && r.id !== "interval-P1" && r.builtIn
+        ? { ...r, enabled: only ? r.id === `interval-${only}` : enabled }
+        : r,
+    ),
+  }));
 }
 
 // ---------- editing ----------

@@ -1,5 +1,5 @@
 import type { Hand, ScheduledNote } from "./types";
-import { intervalLabel } from "./naming";
+import { intervalKey, intervalLabel } from "./naming";
 
 const EPS = 1e-3;
 
@@ -65,6 +65,8 @@ export interface Segment {
   from: ScheduledNote;
   to: ScheduledNote;
   label: string;
+  /** Role key: "P1", "m2" … "P8". */
+  key: string;
 }
 
 export interface HandGeometry {
@@ -84,7 +86,7 @@ export function buildGeometry(notes: ScheduledNote[], hands: Hand[]): HandGeomet
       if (a.breakAfter) continue;
       if ((a.note.system ?? 0) !== (b.note.system ?? 0)) continue;
       if ((b.note.cx ?? 0) < (a.note.cx ?? 0) - 5) continue; // wrapped to a new line
-      segments.push({ from: a.note, to: b.note, label: intervalLabel(a.note.midi, b.note.midi) });
+      segments.push({ from: a.note, to: b.note, label: intervalLabel(a.note.midi, b.note.midi), key: intervalKey(a.note.midi, b.note.midi) });
     }
     return { hand, dots: pts.map((p) => p.note), segments };
   });

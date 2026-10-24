@@ -2,11 +2,21 @@ import { useEffect, useRef, useState } from "react";
 import * as OSMDModule from "opensheetmusicdisplay";
 import { applyStemColors, parseSheetToNotes } from "@/lib/music/parseMusicXml";
 import { activeNotes, getPlaybackSeconds } from "@/lib/music/scheduler";
-import { hoverText } from "@/lib/music/naming";
+import { hoverText, INTERVAL_KEY_LABEL } from "@/lib/music/naming";
 import { buildGeometry } from "@/lib/music/melodicLine";
 import { pitchClassColor } from "@/lib/music/midiUtils";
-import { PLAIN_COLOR } from "@/lib/colors/defaults";
-import { noteSignature, noteTargetOn, subscribe as subscribeColors } from "@/lib/colors/store";
+import {
+  DISABLED_SEGMENT_COLOR,
+  HALO_COLOR,
+  PILL_TEXT_DARK,
+  PILL_TEXT_LIGHT,
+  PLAIN_COLOR,
+  RING_NEUTRAL_COLOR,
+} from "@/lib/colors/defaults";
+import { readableTextOn } from "@/lib/colors/color";
+import type { LineColorMode } from "@/lib/music/lineMode";
+import { IntervalLegend } from "./IntervalLegend";
+import { intervalRole, intervalSignature, noteSignature, noteTargetOn, subscribe as subscribeColors } from "@/lib/colors/store";
 import type { Hand, IsolationMode, ScheduledNote, ScoreView as ViewMode } from "@/lib/music/types";
 
 // CJS/ESM-tolerant constructor lookup — OSMD ships as CJS so the named export
@@ -24,6 +34,7 @@ interface Props {
   view: ViewMode;
   line: boolean;
   intervals: boolean;
+  lineMode: LineColorMode;
   isPlaying: boolean;
   onNotes: (notes: ScheduledNote[]) => void;
 }
@@ -57,6 +68,7 @@ export function ScoreView({
   view,
   line,
   intervals,
+  lineMode,
   isPlaying,
   onNotes,
 }: Props) {
@@ -76,6 +88,8 @@ export function ScoreView({
   lineRef.current = line;
   const intervalsRef = useRef(intervals);
   intervalsRef.current = intervals;
+  const lineModeRef = useRef(lineMode);
+  lineModeRef.current = lineMode;
   const isolationRef = useRef(isolation);
   isolationRef.current = isolation;
   const zoomRef = useRef(zoom);
@@ -88,6 +102,7 @@ export function ScoreView({
 
   const [renderError, setRenderError] = useState<string | null>(null);
   const [reloadNonce, setReloadNonce] = useState(0);
+  const [legendKeys, setLegendKeys] = useState<string[]>([]);
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
 
   const runCleanups = () => {
@@ -209,7 +224,12 @@ export function ScoreView({
     while (svg.firstChild) svg.removeChild(svg.firstChild);
     svg.setAttribute("width", String(wrap.offsetWidth));
     svg.setAttribute("height", String(wrap.offsetHeight));
-    if (!lineRef.current) return;
+    if (!lineRef.current) {
+      setLegendKeys((p) => (p.length ? [] : p));
+      return;
+    }
+    const mode = lineModeRef.current;
+    const useIntervals = mode !== "notas";
 
     const iso = isolationRef.current;
     const hands: Hand[] = iso === "rh" ? ["RH"] : iso === "lh" ? ["LH"] : ["RH", "LH"];
@@ -223,9 +243,11 @@ export function ScoreView({
     const labels = svgEl("g", {});
     svg.append(halos, lines, dots, labels);
 
+    const present = new Set<string>();
     let gid = 0;
     for (const g of geo) {
       for (const seg of g.segments) {
+        present.add(seg.key);
         // Stop the line at the ring around each notehead so the note itself stays visible.
         const dx = seg.to.cx! - seg.from.cx!;
         const dy = seg.to.cy! - seg.from.cy!;
@@ -237,6 +259,49 @@ export function ScoreView({
         const y1 = seg.from.cy! + uy * RING_R;
         const x2 = seg.to.cx! - ux * RING_R;
         const y2 = seg.to.cy! - uy * RING_R;
+        if (useIntervals) {
+          const role = intervalRole(seg.key);
+          const isOff = !!role && role.enabled === false && seg.key !== "P1";
+          const color = role?.color ?? DISABLED_SEGMENT_COLOR;
+          const width = isOff ? 1.5 : 3.5;
+          if (!isOff) {
+            halos.appendChild(
+              svgEl("line", { x1, y1, x2, y2, stroke: HALO_COLOR, "stroke-opacity": 0.85, "stroke-width": width + 2.5, "stroke-linecap": "round" }),
+            );
+          }
+          lines.appendChild(
+            svgEl("line", {
+              x1,
+              y1,
+              x2,
+              y2,
+              stroke: isOff ? DISABLED_SEGMENT_COLOR : color,
+              "stroke-width": width,
+              "stroke-linecap": "round",
+            }),
+          );
+          if (!isOff) {
+            const text = INTERVAL_KEY_LABEL[seg.key] ?? seg.label;
+            const w = text.length * 6.2 + 12;
+            const h = 15;
+            const mx = (x1 + x2) / 2;
+            const my = (y1 + y2) / 2;
+            labels.appendChild(
+              svgEl("rect", { x: mx - w / 2, y: my - h / 2, width: w, height: h, rx: h / 2, fill: color }),
+            );
+            const t = svgEl("text", {
+              x: mx,
+              y: my + 3.8,
+              "text-anchor": "middle",
+              "font-size": 10.5,
+              "font-weight": 700,
+              fill: readableTextOn(color, PILL_TEXT_DARK, PILL_TEXT_LIGHT),
+            });
+            t.textContent = text;
+            labels.appendChild(t);
+          }
+          continue;
+        }
         const id = `mlg-${g.hand}-${gid++}`;
         const grad = svgEl("linearGradient", {
           id,
@@ -296,12 +361,15 @@ export function ScoreView({
             cy: n.cy!,
             r: RING_R,
             fill: "none",
-            stroke: pitchClassColor(n.midi),
+            stroke: mode === "intervalos" ? RING_NEUTRAL_COLOR : pitchClassColor(n.midi),
             "stroke-width": 1.75,
           }),
         );
       }
     }
+    const order = ["P1", "m2", "M2", "m3", "M3", "P4", "TT", "P5", "m6", "M6", "m7", "M7", "P8"];
+    const keys = useIntervals ? order.filter((k) => present.has(k)) : [];
+    setLegendKeys((p) => (p.join() === keys.join() ? p : keys));
   };
 
   /** Re-measure and redraw without re-rendering OSMD. */
@@ -501,9 +569,15 @@ export function ScoreView({
   // Colors — repaint live when the palette changes. Stems need an OSMD re-render (debounced).
   useEffect(() => {
     let lastSig = noteSignature();
+    let lastIntSig = intervalSignature();
     let timer: ReturnType<typeof setTimeout> | null = null;
     const unsub = subscribeColors(() => {
       const sig = noteSignature();
+      const intSig = intervalSignature();
+      if (intSig !== lastIntSig) {
+        lastIntSig = intSig;
+        drawLine();
+      }
       if (sig === lastSig) return;
       lastSig = sig;
       paintNotes(notesRef.current); // accidentals + hover color, instant
@@ -549,7 +623,7 @@ export function ScoreView({
     if (root) root.dataset.isolation = isolation;
     drawLine();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [line, intervals, isolation]);
+  }, [line, intervals, isolation, lineMode]);
 
   // Tocar auto-scroll: keep the playback position under the fixed "now" line.
   useEffect(() => {
@@ -649,6 +723,8 @@ export function ScoreView({
           <svg ref={overlayRef} className="pointer-events-none absolute left-0 top-0" />
         </div>
       </div>
+
+      {line && lineMode !== "notas" && <IntervalLegend keys={legendKeys} />}
 
       {tocar && (
         <div
