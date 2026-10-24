@@ -41,5 +41,5 @@ Sources: Sofia's own copies in `~/Desktop/SOFIA/Books/Music/` — *Illustrated H
 - A dedicated borrowed-chord method (only hints: parallel keys, F→Fm→C, harmonic/melodic minor lists).
 - Synesthesia note colors.
 
-## Color conflict to solve
-His chord colors (pink = major, blue = minor) will sit on the same screen as Sofia's note colors (A = pink, E = celeste…). Rule for the app: **note colors live only on notes (stems, squares, keys); chord colors live only on chord circles (outline, never fill).** Both palettes are editable.
+## Colors: Sofia's win
+Decided 2026-10-24: Sofia's own colors rule the app. Every color is a role in the in-app Color & design studio (see v1-spec §2) that she edits herself; Callipari's chord palette is only an optional preset.

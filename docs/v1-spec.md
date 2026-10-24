@@ -22,11 +22,22 @@ Built on what already exists in `~/code/harmony-helper` (OSMD score rendering, 8
 - Remove the fake PDF path. A PDF shows: "PDF import comes in v2 — export MusicXML from MuseScore for now."
 - Keep a small library of the scores you uploaded (saved in the browser), so you can come back to them.
 
-### 2. Your note colors (synesthesia palette)
-- A palette screen: 12 notes (C, C#/Db … B), each with a full color picker **plus** a row of named swatches (crimson, red, brown, pink, celeste, sky, navy, violet…) so close shades stay distinct.
-- Colors apply to: stems + accidentals on the score (as today), the piano keys, the note squares in every view.
-- Saved locally; export/import the palette as a small file.
-- *Open question:* same color in every octave, or darker low / lighter high?
+### 2. Color & design studio (Sofia's colors rule everything)
+Every color in the app comes from one editable layer that Sofia controls from inside the app — never hard-coded, never needing Claude to change it.
+- **Color roles, grouped:**
+  - *Notes* — 12 pitch classes (C, C#/Db … B), Sofia's synesthesia colors. Default = her current colors.
+  - *Chords* — major, minor, diminished, dominant 7, augmented, sus, "outside the scale". Default = her own choice; Callipari's palette is only an optional preset.
+  - *Intervals* — m2 … octave (or steps 1/2, 1, 1.5).
+  - *Patterns* — A, B, C… for repeated motifs.
+  - *Functions / scale degrees* — tonic, subdominant, dominant; degrees 1–7.
+  - *Interface* — background, text, highlights, playing note.
+- **Add your own roles:** "+ new color" in any group (e.g. a new chord type or category she learns later), with a name and where it applies.
+- **Picker:** full color wheel + hex + a library of named swatches (crimson, red, brown, pink, celeste, sky, navy, violet…), and her own saved swatches.
+- **Where each color shows** is a setting per role (stem / notehead / accidental / piano key / square / circle outline / band).
+- **Live preview:** changes appear immediately on the open score.
+- **Clash warning:** if two roles that appear on the same screen are too similar, the studio says so (it doesn't block her).
+- **Presets / versions:** save the whole set as "Sofia — October 2026", switch, duplicate, go back to an older one; export/import as a file. Old versions are never deleted.
+- *Open question:* notes — same color in every octave, or darker low / lighter high? (The studio can support both; this is only the default.)
 
 ### 3. Height view (notes as heights)
 - A strip under the score: each note of the selected hand drawn as a **square at its pitch height** (Callipari's notation 2A turned vertical), in your note color, time running left to right in sync with the score.
@@ -37,7 +48,7 @@ Built on what already exists in `~/code/harmony-helper` (OSMD score rendering, 8
 ### 4. Pattern finder (color-coded repeats)
 - The app looks for **melodic patterns** (same sequence of intervals, even if it starts on another note) and **rhythmic patterns** (same sequence of durations), 2–8 notes long, that repeat.
 - Each pattern gets a color band above the measures where it appears (A, B, C…), and a side list: "Pattern A — 4 notes, appears 6 times, measures 1, 3, 9…". Click a pattern → the score highlights every occurrence.
-- Pattern colors use a separate palette from note colors, so they never clash.
+- Pattern colors come from the *Patterns* group in the studio.
 
 ### 5. Scale first
 - The app detects the piece's **key / scale** from its notes (key signature + which notes appear how often), and shows it as a Callipari scale strip (squares with 1 / 1/2 steps) and as his mode tile when it's a mode (characteristic note lighter/darker).
@@ -45,7 +56,7 @@ Built on what already exists in `~/code/harmony-helper` (OSMD score rendering, 8
 - **Scale practice**: play the scale on your MIDI keyboard up and down; the app waits for each correct note (wait mode), then at 50 / 75 / 100% speed.
 
 ### 6. Chords of the scale, then chords of the piece
-- **Chords of the scale**: the 7 chords built by stacking every other note, as Callipari circles (pink major, blue minor, violet diminished, yellow dominant 7, green augmented) with their degree number 1–7, wired to the scale strip.
+- **Chords of the scale**: the 7 chords built by stacking every other note, as Callipari-style circles colored by chord type (colors from the studio) with their degree number 1–7, wired to the scale strip.
 - **Chords of the piece**: the app names the chord in each beat/measure from the notes sounding together, writes it above the score as a small circle, and marks with a dashed outline any chord that is *outside* the scale (a first hint of borrowing or modulation).
 - Click a chord circle → every place it appears lights up; play it on the piano.
 
