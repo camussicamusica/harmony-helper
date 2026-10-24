@@ -3,6 +3,8 @@ import * as OSMDModule from "opensheetmusicdisplay";
 import { applyStemColors, parseSheetToNotes } from "@/lib/music/parseMusicXml";
 import { activeNotes } from "@/lib/music/scheduler";
 import { pitchClassColor } from "@/lib/music/midiUtils";
+import { PLAIN_COLOR } from "@/lib/colors/defaults";
+import { noteSignature, noteTargetOn, subscribe as subscribeColors } from "@/lib/colors/store";
 import type { IsolationMode, ScheduledNote } from "@/lib/music/types";
 
 // CJS/ESM-tolerant constructor lookup — OSMD ships as CJS so the named export
@@ -29,6 +31,13 @@ export function ScoreView({ xml, bpm, isolation, zoom, contour, onNotes }: Props
   const cleanupRef = useRef<Array<() => void>>([]);
   const bpmRef = useRef(bpm);
   bpmRef.current = bpm;
+  const onNotesRef = useRef(onNotes);
+  onNotesRef.current = onNotes;
+  const notesRef = useRef<ScheduledNote[]>([]);
+  const contourRef = useRef(contour);
+  contourRef.current = contour;
+  const zoomRef = useRef(zoom);
+  zoomRef.current = zoom;
 
   const [renderError, setRenderError] = useState<string | null>(null);
   const [reloadNonce, setReloadNonce] = useState(0);
@@ -47,6 +56,32 @@ export function ScoreView({ xml, bpm, isolation, zoom, contour, onNotes }: Props
     }
   };
 
+  /** Repaint accidentals and the hover/playing color from the palette. No OSMD re-render needed. */
+  const paintNotes = (notes: ScheduledNote[]) => {
+    for (const note of notes) {
+      const color = pitchClassColor(note.midi);
+      const accColor = noteTargetOn(note.midi, "accidental") ? color : PLAIN_COLOR;
+      for (const aEl of note.accidentalEls ?? []) {
+        try {
+          aEl.setAttribute("fill", accColor);
+          aEl.style.fill = accColor;
+          aEl.classList.add("accidental-colored");
+          aEl
+            .querySelectorAll<SVGElement>("path, rect, ellipse, polygon, text")
+            .forEach((child) => {
+              child.setAttribute("fill", accColor);
+              child.style.fill = accColor;
+            });
+        } catch {
+          /* ignore detached node */
+        }
+      }
+      for (const el of note.svgEls ?? []) {
+        el.style.setProperty("--note-color", color);
+      }
+    }
+  };
+
   const wireAfterRender = (notesOut: (n: ScheduledNote[]) => void) => {
     runCleanups();
     activeNotes.clearHover();
@@ -55,30 +90,12 @@ export function ScoreView({ xml, bpm, isolation, zoom, contour, onNotes }: Props
     if (!osmd) return;
     const { notes } = parseSheetToNotes(osmd, bpmRef.current);
 
+    notesRef.current = notes;
+    paintNotes(notes);
+
     for (const note of notes) {
-      const color = pitchClassColor(note.midi);
-
-      if (note.accidentalEls?.length) {
-        for (const aEl of note.accidentalEls) {
-          try {
-            aEl.setAttribute("fill", color);
-            aEl.style.fill = color;
-            aEl.classList.add("accidental-colored");
-            aEl
-              .querySelectorAll<SVGElement>("path, rect, ellipse, polygon, text")
-              .forEach((child) => {
-                child.setAttribute("fill", color);
-                child.style.fill = color;
-              });
-          } catch {
-            /* ignore detached node */
-          }
-        }
-      }
-
       if (!note.svgEls?.length) continue;
       for (const el of note.svgEls) {
-        el.style.setProperty("--note-color", color);
         const onEnter = () => {
           activeNotes.addHover(note.midi, note.hand);
           el.classList.add("note-hover");
@@ -97,7 +114,7 @@ export function ScoreView({ xml, bpm, isolation, zoom, contour, onNotes }: Props
     }
 
     drawContourLayer(containerRef.current, notes);
-    applyContourVisibility(containerRef.current, contour);
+    applyContourVisibility(containerRef.current, contourRef.current);
 
     notesOut(notes);
   };
@@ -180,6 +197,36 @@ export function ScoreView({ xml, bpm, isolation, zoom, contour, onNotes }: Props
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [zoom]);
+
+  // Colors — repaint live when the palette changes. Stems need an OSMD re-render (debounced).
+  useEffect(() => {
+    let lastSig = noteSignature();
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const unsub = subscribeColors(() => {
+      const sig = noteSignature();
+      if (sig === lastSig) return;
+      lastSig = sig;
+      paintNotes(notesRef.current); // accidentals + hover color, instant
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        const osmd = osmdRef.current;
+        if (!osmd) return;
+        try {
+          applyStemColors(osmd);
+          (osmd as any).Zoom = zoomRef.current;
+          osmd.render();
+          wireAfterRender(onNotesRef.current);
+        } catch (e) {
+          console.error("Color re-render failed:", e);
+        }
+      }, 150);
+    });
+    return () => {
+      unsub();
+      if (timer) clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // BPM — recompute timings only.
   useEffect(() => {

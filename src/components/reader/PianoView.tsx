@@ -2,6 +2,8 @@ import { useSyncExternalStore } from "react";
 import { activeNotes } from "@/lib/music/scheduler";
 import { buildKeyboardGeometry, midiToName } from "@/lib/music/midiUtils";
 import type { IsolationMode } from "@/lib/music/types";
+import { pianoKeyColor, subscribe as subscribeColors, getState } from "@/lib/colors/store";
+import { BLACK_KEY_COLOR } from "@/lib/colors/defaults";
 
 interface Props {
   isolation: IsolationMode;
@@ -14,6 +16,9 @@ const BLACK_H = 100;
 export function PianoView({ isolation }: Props) {
   // Subscribe to active-notes store.
   useSyncExternalStore(activeNotes.subscribe, activeNotes.getSnapshot, activeNotes.getSnapshot);
+
+  // Re-render when the palette changes.
+  useSyncExternalStore(subscribeColors, getState, getState);
 
   const geom = buildKeyboardGeometry(WHITE_W);
 
@@ -40,7 +45,9 @@ export function PianoView({ isolation }: Props) {
         {/* White keys */}
         {whites.map((k) => {
           const active = isActive(k.midi);
-          const fill = active === "RH" ? "var(--color-rh)" : active === "LH" ? "var(--color-lh)" : "white";
+          const fill = active
+            ? (pianoKeyColor(k.midi) ?? (active === "RH" ? "var(--color-rh)" : "var(--color-lh)"))
+            : "white";
           const stroke = "var(--color-border)";
           return (
             <g key={k.midi}>
@@ -72,7 +79,9 @@ export function PianoView({ isolation }: Props) {
         {/* Black keys (drawn on top) */}
         {blacks.map((k) => {
           const active = isActive(k.midi);
-          const fill = active === "RH" ? "var(--color-rh)" : active === "LH" ? "var(--color-lh)" : "#1a1a1a";
+          const fill = active
+            ? (pianoKeyColor(k.midi) ?? (active === "RH" ? "var(--color-rh)" : "var(--color-lh)"))
+            : BLACK_KEY_COLOR;
           return (
             <g key={k.midi}>
               <rect
@@ -81,7 +90,7 @@ export function PianoView({ isolation }: Props) {
                 width={k.width}
                 height={BLACK_H}
                 fill={fill}
-                stroke="#1a1a1a"
+                stroke={BLACK_KEY_COLOR}
                 strokeWidth={1}
                 rx={2}
               />

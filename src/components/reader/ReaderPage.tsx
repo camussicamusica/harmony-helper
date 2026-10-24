@@ -12,6 +12,7 @@ import {
   setIsolation,
   stop,
 } from "@/lib/music/scheduler";
+import { applyInterfaceVars } from "@/lib/colors/store";
 import type { IsolationMode, ScheduledNote } from "@/lib/music/types";
 
 export function ReaderPage() {
@@ -25,6 +26,10 @@ export function ReaderPage() {
 
   const handleNotes = useCallback((notes: ScheduledNote[]) => {
     void loadNotes(notes);
+  }, []);
+
+  useEffect(() => {
+    applyInterfaceVars();
   }, []);
 
   useEffect(() => {

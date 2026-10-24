@@ -1,3 +1,5 @@
+import { noteColor } from "@/lib/colors/store";
+
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 const BLACK_PCS = new Set([1, 3, 6, 8, 10]);
 
@@ -14,27 +16,9 @@ export function isBlackKey(midi: number): boolean {
   return BLACK_PCS.has(midi % 12);
 }
 
-/**
- * Pitch-class → color (Solfège mapping).
- * Accidentals adopt the nearest natural's color (sharp uses lower neighbor).
- */
-const PC_COLORS: Record<number, string> = {
-  0: "#E53935",  // C  - Red
-  1: "#E53935",  // C# (-> C)
-  2: "#F9C81E",  // D  - Yellow
-  3: "#F9C81E",  // D# (-> D)
-  4: "#7EC8F2",  // E  - Light Blue
-  5: "#8B5A2B",  // F  - Brown
-  6: "#8B5A2B",  // F# (-> F)
-  7: "#1E5FBF",  // G  - Deeper Blue (distinct from E)
-  8: "#1E5FBF",  // G# (-> G)
-  9: "#F06292",  // A  - Pink
-  10: "#F06292", // A# (-> A)
-  11: "#8E24AA", // B  - Violet
-};
-
+/** Pitch-class → color. Reads the current palette (see src/lib/colors). */
 export function pitchClassColor(midi: number): string {
-  return PC_COLORS[midi % 12] ?? "#000000";
+  return noteColor(midi);
 }
 
 export interface KeyGeometry {

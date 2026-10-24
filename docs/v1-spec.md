@@ -37,6 +37,7 @@ Every color in the app comes from one editable layer that Sofia controls from in
 - **Live preview:** changes appear immediately on the open score.
 - **Clash warning:** if two roles that appear on the same screen are too similar, the studio says so (it doesn't block her).
 - **Presets / versions:** save the whole set as "Sofia — October 2026", switch, duplicate, go back to an older one; export/import as a file. Old versions are never deleted.
+- **Fade-out mode (training wheels):** each note color can be switched on/off from a strip of 12 chips in the toolbar (plus All / None). Start with every note colored, take them off one by one (e.g. keep only C, E, A), until the score is plain black. On/off sets save with versions.
 - *Open question:* notes — same color in every octave, or darker low / lighter high? (The studio can support both; this is only the default.)
 
 ### 3. Height view (notes as heights)

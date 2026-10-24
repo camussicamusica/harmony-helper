@@ -2,6 +2,8 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import type { IsolationMode } from "@/lib/music/types";
+import { ColorStudio } from "@/components/studio/ColorStudio";
+import { NoteColorStrip } from "./NoteColorStrip";
 import { Minus, Pause, Play, Plus, Square, Upload } from "lucide-react";
 
 interface Props {
@@ -143,6 +145,10 @@ export function TopBar({
         <Switch checked={contour} onCheckedChange={onContourChange} />
         <span className={contour ? "italic text-foreground" : ""}>Contour Lines</span>
       </label>
+
+      <NoteColorStrip />
+
+      <ColorStudio />
 
       <div className="ml-auto">
         <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-border bg-background px-3 py-1.5 text-xs hover:bg-accent">

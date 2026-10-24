@@ -1,6 +1,8 @@
 import type { OpenSheetMusicDisplay } from "opensheetmusicdisplay";
 import type { Hand, ScheduledNote } from "./types";
-import { midiToName, pitchClassColor } from "./midiUtils";
+import { midiToName } from "./midiUtils";
+import { noteColor, noteTargetOn } from "@/lib/colors/store";
+import { PLAIN_COLOR } from "@/lib/colors/defaults";
 
 export interface ParseResult {
   notes: ScheduledNote[];
@@ -9,10 +11,9 @@ export interface ParseResult {
 }
 
 /**
- * Set per-VoiceEntry stem colors based on the bottom note's pitch class.
+ * Set per-VoiceEntry stem colors (bottom note's pitch class) and per-note
+ * notehead colors (only where the note's "notehead" target is on).
  * MUST be called AFTER osmd.load() and BEFORE osmd.render().
- * Noteheads are intentionally left at their default color so duration
- * (filled vs. hollow) remains visually readable.
  */
 export function applyStemColors(osmd: OpenSheetMusicDisplay) {
   const sheet: any = (osmd as any).Sheet;
@@ -34,9 +35,11 @@ export function applyStemColors(osmd: OpenSheetMusicDisplay) {
             if (!p) continue;
             const midi = (p.halfTone ?? 0) + 12;
             if (midi < bottomMidi) bottomMidi = midi;
+            // Hollow noteheads stay hollow when colored, so duration stays readable.
+            n.NoteheadColor = noteTargetOn(midi, "notehead") ? noteColor(midi) : PLAIN_COLOR;
           }
           if (bottomMidi !== Infinity) {
-            ve.StemColor = pitchClassColor(bottomMidi);
+            ve.StemColor = noteTargetOn(bottomMidi, "stem") ? noteColor(bottomMidi) : PLAIN_COLOR;
           }
         }
       }
