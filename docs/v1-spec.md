@@ -83,11 +83,14 @@ Every color in the app comes from one editable layer that Sofia controls from in
 - Pattern finding: compare sequences of (interval, duration) per hand; keep repeats of length ≥ 2 that occur ≥ 2 times, prefer longer.
 - Chord naming: group simultaneous notes per beat, match against chord shapes with `tonal`, fall back to "?" rather than guessing.
 - Everything runs in the browser; storage = IndexedDB. Remove Lovable-only files.
-- Test scores: the bundled Bach excerpt + 2–3 free MusicXML pieces Sofia chooses.
+- Test scores (what Sofia is studying, 2026-10-24): Fito Páez *Un vestido y un amor* (A♭ major), Satie *Gnossienne* [which number: to be filled], Satie *Gymnopédie* [which number: to be filled], Pink Floyd *The Great Gig in the Sky*. Plus the bundled Bach excerpt.
+  - Satie is public domain: free MusicXML exists. Fito Páez and Pink Floyd are copyrighted: use Sofia's own scores, private use only, never bundled in the app.
+  - Gnossiennes have no bar lines and no key signature: a hard test for key detection and measure numbers. Good on purpose.
+  - A♭ major (4 flats) tests flat spelling: the app must say A♭, not G#.
+- Platform: Mac + Chrome only. iPad later, maybe; keep the layout from ruling it out.
 
 ## Open questions for Sofia
 1. Note colors: same color in every octave, or shades by octave?
-2. Which 2–3 pieces should be the test scores? (Ideally ones you are studying now, as MusicXML.)
+2. Which Gnossienne and which Gymnopédie (No. 1, 2, 3…)? Do you have MusicXML for the Fito Páez and Pink Floyd pieces, or only PDFs?
 3. Height view: under the score (my suggestion) or on top of it?
 4. Interval labels by default as names (m3, M3) or as steps (1, 1/2)?
-5. Is the Mac + Chrome enough, or do you also want it on the iPad later?
