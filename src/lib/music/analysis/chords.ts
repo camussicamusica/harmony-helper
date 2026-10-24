@@ -54,6 +54,13 @@ export const FUNCTION_ES: Record<ChordFunction, string> = {
   D: "Dominante",
 };
 
+/** Short labels: never a single letter, so "D" is never confused with the note Re (D). */
+export const FUNCTION_SHORT: Record<ChordFunction, string> = {
+  T: "Tón",
+  SD: "Subd",
+  D: "Dom",
+};
+
 export const isSeventh = (q: ChordQuality) =>
   q === "dominant7" || q === "major7" || q === "minor7" || q === "halfDim7" || q === "dim7";
 
@@ -105,8 +112,10 @@ export function romanFor(index: number, q: ChordQuality): string {
 
 /** Function of each scale degree (index 0..6). Callipari: shared notes with I on the relative major. */
 const MAJOR_FUNCTIONS: ChordFunction[] = ["T", "SD", "T", "SD", "D", "T", "D"];
+/** Minor follows the relative major, except v, which is D as taught at the conservatorio (Sofia, 2026-10-24). */
+const MINOR_FUNCTIONS: ChordFunction[] = ["T", "D", "T", "SD", "D", "SD", "D"];
 export function functionOf(mode: "major" | "minor", index: number): ChordFunction {
-  return MAJOR_FUNCTIONS[mode === "major" ? index : (index + 5) % 7];
+  return (mode === "major" ? MAJOR_FUNCTIONS : MINOR_FUNCTIONS)[index];
 }
 
 export interface ScaleChord {

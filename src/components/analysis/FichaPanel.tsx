@@ -13,6 +13,7 @@ import { keyFromId } from "@/lib/music/analysis/key";
 import {
   FUNCTION_ROLE,
   FUNCTION_ES,
+  FUNCTION_SHORT,
   scaleMidi,
   scaleSteps,
   voiceChordMidi,
@@ -219,14 +220,14 @@ export function FichaPanel({
                         }}
                         title={FUNCTION_ES[c.fn]}
                       >
-                        {c.fn}
+                        {FUNCTION_SHORT[c.fn]}
                       </span>
                       <span className="text-center text-[9px] leading-tight text-muted-foreground">{c.notesEs.join(" ")}</span>
                     </button>
                   );
                 })}
               </div>
-              <p className="mt-2 text-[11px] text-muted-foreground">T = tónica · SD = subdominante · D = dominante</p>
+              <p className="mt-2 text-[11px] text-muted-foreground">Tón = tónica · Subd = subdominante · Dom = dominante</p>
             </Section>
 
             {/* d. Acordes de la pieza */}
