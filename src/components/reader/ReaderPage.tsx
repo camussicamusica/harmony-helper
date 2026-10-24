@@ -11,7 +11,7 @@ import {
   setIsolation,
   stop,
 } from "@/lib/music/scheduler";
-import { useLineMode } from "@/lib/music/lineMode";
+import { useAlwaysLabels, useLineMode } from "@/lib/music/lineMode";
 import { applyInterfaceVars } from "@/lib/colors/store";
 import type { IsolationMode, ScheduledNote, ScoreView as ViewMode } from "@/lib/music/types";
 
@@ -24,7 +24,7 @@ export function ReaderPage() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [line, setLine] = useState(false);
-  const [intervals, setIntervals] = useState(false);
+  const [intervals, setIntervals] = useAlwaysLabels();
   const [lineMode, setLineMode] = useLineMode();
   const [view, setViewState] = useState<ViewMode>("tocar");
   const [viewReady, setViewReady] = useState(false);

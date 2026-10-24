@@ -31,3 +31,26 @@ export function useLineMode(): [LineColorMode, (m: LineColorMode) => void] {
   };
   return [mode, setMode];
 }
+
+const LABELS_KEY = "hh.alwaysLabels.v1";
+
+/** "Etiquetas siempre" switch, remembered in localStorage. Default off. */
+export function useAlwaysLabels(): [boolean, (v: boolean) => void] {
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(LABELS_KEY) === "1") setOn(true);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  const set = (v: boolean) => {
+    setOn(v);
+    try {
+      localStorage.setItem(LABELS_KEY, v ? "1" : "0");
+    } catch {
+      /* ignore */
+    }
+  };
+  return [on, set];
+}

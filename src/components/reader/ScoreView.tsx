@@ -86,8 +86,8 @@ export function ScoreView({
   const notesRef = useRef<ScheduledNote[]>([]);
   const lineRef = useRef(line);
   lineRef.current = line;
-  const intervalsRef = useRef(intervals);
-  intervalsRef.current = intervals;
+  const alwaysLabelsRef = useRef(intervals);
+  alwaysLabelsRef.current = intervals;
   const lineModeRef = useRef(lineMode);
   lineModeRef.current = lineMode;
   const isolationRef = useRef(isolation);
@@ -241,7 +241,45 @@ export function ScoreView({
     const lines = svgEl("g", {});
     const dots = svgEl("g", {});
     const labels = svgEl("g", {});
-    svg.append(halos, lines, dots, labels);
+    const hoverLabel = svgEl("g", {});
+    const hits = svgEl("g", {});
+    labels.setAttribute("pointer-events", "none");
+    hoverLabel.setAttribute("pointer-events", "none");
+    svg.append(halos, lines, dots, labels, hoverLabel, hits);
+    const always = alwaysLabelsRef.current;
+
+    /** Labels are hidden by default: hover shows one segment's label, "Etiquetas siempre" keeps all. */
+    const attachLabel = (
+      x1: number,
+      y1: number,
+      x2: number,
+      y2: number,
+      visible: SVGElement,
+      width: number,
+      nodes: SVGElement[],
+    ) => {
+      if (always) nodes.forEach((n) => labels.appendChild(n));
+      const hit = svgEl("line", {
+        x1,
+        y1,
+        x2,
+        y2,
+        stroke: "#000000",
+        "stroke-opacity": 0,
+        "stroke-width": 14,
+        "stroke-linecap": "butt",
+        "pointer-events": "stroke",
+      });
+      hit.addEventListener("pointerenter", () => {
+        if (!always) nodes.forEach((n) => hoverLabel.appendChild(n));
+        visible.setAttribute("stroke-width", String(width + 1.5));
+      });
+      hit.addEventListener("pointerleave", () => {
+        if (!always) nodes.forEach((n) => n.remove());
+        visible.setAttribute("stroke-width", String(width));
+      });
+      hits.appendChild(hit);
+    };
 
     const present = new Set<string>();
     let gid = 0;
@@ -269,26 +307,23 @@ export function ScoreView({
               svgEl("line", { x1, y1, x2, y2, stroke: HALO_COLOR, "stroke-opacity": 0.85, "stroke-width": width + 2.5, "stroke-linecap": "round" }),
             );
           }
-          lines.appendChild(
-            svgEl("line", {
-              x1,
-              y1,
-              x2,
-              y2,
-              stroke: isOff ? DISABLED_SEGMENT_COLOR : color,
-              "stroke-width": width,
-              "stroke-linecap": "round",
-            }),
-          );
+          const visLine = svgEl("line", {
+            x1,
+            y1,
+            x2,
+            y2,
+            stroke: isOff ? DISABLED_SEGMENT_COLOR : color,
+            "stroke-width": width,
+            "stroke-linecap": "round",
+          });
+          lines.appendChild(visLine);
           if (!isOff) {
             const text = INTERVAL_KEY_LABEL[seg.key] ?? seg.label;
             const w = text.length * 6.2 + 12;
             const h = 15;
             const mx = (x1 + x2) / 2;
             const my = (y1 + y2) / 2;
-            labels.appendChild(
-              svgEl("rect", { x: mx - w / 2, y: my - h / 2, width: w, height: h, rx: h / 2, fill: color }),
-            );
+            const pill = svgEl("rect", { x: mx - w / 2, y: my - h / 2, width: w, height: h, rx: h / 2, fill: color });
             const t = svgEl("text", {
               x: mx,
               y: my + 3.8,
@@ -298,7 +333,7 @@ export function ScoreView({
               fill: readableTextOn(color, PILL_TEXT_DARK, PILL_TEXT_LIGHT),
             });
             t.textContent = text;
-            labels.appendChild(t);
+            attachLabel(x1, y1, x2, y2, visLine, width, [pill, t]);
           }
           continue;
         }
@@ -326,18 +361,17 @@ export function ScoreView({
             "stroke-linecap": "round",
           }),
         );
-        lines.appendChild(
-          svgEl("line", {
-            x1,
-            y1,
-            x2,
-            y2,
-            stroke: `url(#${id})`,
-            "stroke-width": 2.5,
-            "stroke-linecap": "round",
-          }),
-        );
-        if (intervalsRef.current) {
+        const visLine = svgEl("line", {
+          x1,
+          y1,
+          x2,
+          y2,
+          stroke: `url(#${id})`,
+          "stroke-width": 2.5,
+          "stroke-linecap": "round",
+        });
+        lines.appendChild(visLine);
+        {
           const t = svgEl("text", {
             x: (x1 + x2) / 2,
             y: (y1 + y2) / 2 - 7,
@@ -351,7 +385,7 @@ export function ScoreView({
             "stroke-linejoin": "round",
           });
           t.textContent = seg.label;
-          labels.appendChild(t);
+          attachLabel(x1, y1, x2, y2, visLine, 2.5, [t]);
         }
       }
       for (const n of g.dots) {

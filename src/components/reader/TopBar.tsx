@@ -209,19 +209,15 @@ export function TopBar({
           </div>
         )}
 
-        {/* In Intervalos / Ambos the labels always show as pills, so this switch only matters in Notas. */}
+        {/* Labels show on hover; this switch keeps them all visible in every mode. */}
         <label
-          title={lineMode !== "notas" ? "En Intervalos y Ambos las etiquetas siempre se muestran" : undefined}
+          title="Mostrar todas las etiquetas todo el tiempo (si no, aparecen al pasar el mouse por un tramo)"
           className={`flex items-center gap-2 text-xs text-muted-foreground ${
-            line && lineMode === "notas" ? "cursor-pointer" : "cursor-not-allowed opacity-50"
+            line ? "cursor-pointer" : "cursor-not-allowed opacity-50"
           }`}
         >
-          <Switch
-            checked={lineMode !== "notas" || intervals}
-            disabled={!line || lineMode !== "notas"}
-            onCheckedChange={onIntervalsChange}
-          />
-          <span className={intervals && line ? "italic text-foreground" : ""}>Etiquetas</span>
+          <Switch checked={intervals} disabled={!line} onCheckedChange={onIntervalsChange} />
+          <span className={intervals && line ? "italic text-foreground" : ""}>Etiquetas siempre</span>
         </label>
 
         {view === "estudiar" && (

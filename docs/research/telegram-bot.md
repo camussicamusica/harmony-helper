@@ -4,54 +4,46 @@ updated: 2026-10-24
 tags: [harmony-helper, conservatorio, bot]
 ---
 
-# Bot de teoría musical del Conservatorio Piazzolla: resultado de la búsqueda
+# Astorito (@TyPMusBot): qué hace y cómo llevarlo a Harmony Helper
 
-## Veredicto
+Bot de Telegram hecho por un alumno del Conservatorio "Astor Piazzolla" para la materia Teoría y Práctica (TyP). Lo recorrimos el 2026-10-24, con permiso de Sofia, desde su Telegram: todos los botones menos "Reportá" y "Programa" (que es un link externo). En Drive no había ninguna exportación del bot: los `message_1.html` que encontramos son mensajes directos de Instagram.
 
-No encontrado. En el Drive de Sofia (camussisofia@gmail.com) no hay exportaciones de Telegram, y no hay ningún bot de teoría musical en los archivos revisados. No hay nada que documentar sobre comandos, ejercicios ni feedback del bot.
+> ⚠️ La descripción pública del bot hoy dice "BEST CASINO MINI-APP" y linkea a otro bot. Eso no lo puso el alumno: alguien cambió la descripción o tomó el bot. **No abrir ese link.** El contenido de los botones sigue siendo el original de TyP.
 
-## Por qué los archivos `message_1.html` no son de Telegram
+## Cómo está construido (lo que se ve desde afuera)
+- **No conversa.** Es un bot de botones con respuestas armadas, no una IA. Ante texto libre contesta (resumido): "no te entiendo, todavía no sé conversar pero tengo muchos botones", y te manda a /start.
+- Personalidad: un robot ("el droide de Asr", "As2d2 procesando…"), con emojis y saluda por el nombre.
+- Todo es un árbol de menús (botones inline). Los contenidos son **archivos pregrabados**: audios, imágenes de partituras y PDFs.
+- Cada respuesta termina con navegación: Atrás / Home / Terminar.
+- Varias categorías dicen "No tengo materiales en esa categoría". El contenido quedó incompleto.
 
-Son exportaciones de mensajes directos de **Instagram**, no de Telegram:
+## Menú principal y qué hay en cada rama
 
-- Telegram Desktop exporta `messages.html` dentro de una carpeta `ChatExport_...`. Instagram exporta `message_1.html` dentro de `messages/inbox/<usuario>_<id>/`.
-- Las carpetas padre tienen el formato de Instagram, usuario seguido de un número. Todas cuelgan de una carpeta `inbox`.
-- El HTML que se abrió incluye el logo de Instagram y enlaces a instagram.com.
+| Botón | Camino | Qué entrega |
+|---|---|---|
+| **Dictados** | Melódicos / Rítmicos → año (I, II, II Vde, III, IV, I 2024) → número 1–12 | 5 audios: la obra **completa**, después "compases 1, 2 y primer sonido del 3", "3, 4 y primer sonido del 5", "5, 6 y primer sonido del 7", "7 y 8". Botones: **Tonalidad y/o compás** (pista: "Está en Mi Mayor y en 3/4") y **Solución** (imagen de la partitura). |
+| **Hindemith** | capítulos III–X | Probé el III y el VI: "no tengo materiales". (Libro: Hindemith, *Adiestramiento elemental para músicos*.) |
+| **Melo Castillo** | capítulos II–XI → número de ejercicio (p. ej. 46, 51) | Audio de referencia del ejercicio de lectura (~27 s). |
+| **Lecturas** | Melódicas / Rítmicas → año | Rítmicas año I: "no tengo materiales". |
+| **Solfeos** | libro (Suffern) → lección 1, 2, 3, 4, 6, 8, 9, 12 | **Dos audios por lección: "Piano y voz" y "Piano solo"**, para escuchar el modelo y después cantar sobre el acompañamiento. |
+| **Teoría** | Apuntes → PDFs (acordes mayores y menores, aumentados y disminuidos, V7, V9, VII7…) · Ejercicios → Acordes → "por tonalidad" (por año) / "sobre un bajo" | Ejercicio: "Escribí el siguiente acorde, invertilo, cifralo y si corresponde resolvelo" + imagen con la consigna + botón Solución. |
+| **Bibliografía** | lista de libros | Atlas de la Música I (A y B), Copland *Cómo escuchar la música*, Cordantonopulos *Teoría*, Cuadernillo de Audioperceptiva, Hindemith, Melo Castillo, Olazábal *Acústica*, Ropartz 2b, Suffern, Zamacois *Formas*. (PDFs de libros con copyright: no los descargamos.) |
+| **Secuencias** | Melódicas / Rítmicas → fundamental (A, Ab, B, Bb, C, C#, D, Db, E, Eb, F, F#, G, Gb) → modo | Primero **manda la escala** en audio ("Do Mayor: Do, Re, Mi…") y después la secuencia melódica en esa tonalidad. |
+| **Reconocimientos** | Acordes / Escalas → año | Un audio corto (~5 s) y "cuando lo tengas pedime la solución". Solución en texto, p. ej. "Quinta disminuida". Botón "Otro!!". |
+| Programa | link externo | No abierto. |
+| Reportá | | No usado. |
 
-Carpetas padre identificadas (solo nombre, sin leer contenido personal):
+## Qué llevar a Harmony Helper (y cómo mejorarlo con el teclado MIDI)
+1. **Dictado por fragmentos con solape**: completo, después de a dos compases + "primer sonido del siguiente". Es muy buena didáctica. La app lo genera desde **cualquier partitura** (Tone.js) en vez de audios fijos. Sofia contesta **tocando en el MIDI**, la app corrige nota por nota y muestra la solución sobre la partitura, con sus colores.
+2. **Pistas escalonadas**: primero tonalidad y compás, después la solución. Que se pueda pedir de a una pista (encaja con "de a uno").
+3. **Escala antes que la secuencia**: es exactamente "escala primero" del spec. Se elige la fundamental (12 tonos) y el modo.
+4. **Reconocimiento con "Otro!!"**: bucle infinito de intervalos, acordes y escalas, con la respuesta a demanda. La app puede pedir la respuesta **tocándola** o eligiéndola, y llevar la cuenta.
+5. **Ejercicio de acordes "escribí, invertí, cifrá, resolvé"**: en la app, la consigna aparece ("V7 de Fa mayor, 1ª inversión") y Sofia lo toca en el MIDI. La app valida notas e inversión y muestra la resolución (V7 → I) en el panel de análisis.
+6. **Solfeo "piano y voz" / "piano solo"**: modo acompañamiento. La app toca una mano o el acompañamiento y Sofia toca o canta la otra parte.
+7. **Organización por año (I–IV) y por libro**: se puede usar como "nivel", cruzándolo con la progresión del conservatorio (ver conservatorio.md).
+8. **Tono amable con personaje**: un asistente con nombre que saluda y alienta. Sin infantilizar.
 
-| Carpeta | Observación |
-|---|---|
-| `conservatoriodemusicaastorpiazzolla_1498045901600972` (2 copias, 04-20 y 04-24) | Hilo de DM con la cuenta de Instagram del conservatorio. No leído. |
-| `noticiasdelpiazzolla_8028576963821995` | Hilo de DM con una cuenta de noticias. No leído, probablemente no sea un bot. |
-| `astor_766951541377082` | Chat personal con una persona llamada Astor. Leído lo mínimo para descartarlo: conversación entre personas sobre poesía. No es un bot. |
-| `sebastianmisuraca_235596911639902` (823 KB) | No relacionado. No leído. |
-| `facundosaldunvides_1725749095497317` (2 copias) | No relacionado. No leído. |
-| `1bey_1254200202652211` (2 copias) | No relacionado. No leído. |
-
-Quedan sin abrir los demás ids de partida. Comparten carpeta `inbox` y formato Instagram, así que casi seguro son DMs. No se profundizó en ellos.
-
-## Qué se buscó
-
-- Títulos con "Piazzol" y "Astor": aparecen la carta `Carta al Piazzolla`, PDFs de inscripción al Conservatorio Superior de Música Astor Piazzolla y las carpetas de Instagram de arriba. No hay chat de bot.
-- Búsqueda de texto completo "Piazzolita" o "Astorito": sin coincidencias que sean un bot. Las coincidencias son exportaciones de Instagram y Substack no relacionadas.
-- Búsqueda de texto "Conservatorio" en HTML: solo devolvió `message_1.html` de Instagram.
-- La búsqueda por título "ChatExport" o "Telegram" falló por error del conector ("Operation is not implemented"). No se pudo completar. Convendría repetirla.
-- En Drive también hay material teórico del conservatorio en PDF, que sí sirve como contenido pedagógico para Harmony Helper:
-  - "TyP2" (Teoría y Práctica 2): material de repaso sobre intervalos, escalas, tipos de inicio, funciones tonales y cadencias, más ejercitación de solfeo y ritmo.
-  - Apreciación Musical.
-  - Programas SADE nivel medio.
-
-## Qué puede hacer Sofia para encontrar el bot
-
-1. Abrir Telegram y buscar `Piazzol`, `Astor` y `bot teoría` en la búsqueda global.
-2. Revisar los chats con "BotFather" no sirve: el bot lo creó otra persona. Mejor preguntar a la compañera o compañero del conservatorio, o buscar el enlace en grupos del Conservatorio (WhatsApp o Telegram).
-3. Si lo encuentra, exportar el chat desde Telegram Desktop (menú de tres puntos, "Export chat history", formato HTML) y subirlo al Drive.
-4. Con esa exportación, se puede completar este documento (comandos, tipos de ejercicio, feedback, dificultad, manejo de audio y notación).
-
-## Mientras tanto: ideas del material del conservatorio para Harmony Helper
-
-Son hipótesis propias, no del bot:
-
-- Secuenciar la dificultad con el temario del TyP2: intervalos, escalas, funciones tonales, cadencias.
-- Ejercicios de intervalos y escalas tocados en el teclado MIDI, con colores de notación como feedback inmediato.
+## Qué no conviene copiar
+- Contenido fijo e incompleto (muchos "no tengo materiales"): la app genera los ejercicios.
+- Libros en PDF con copyright: la app cita la bibliografía, no la reparte.
+- Respuesta solo "a ojo": la app puede corregir de verdad con el MIDI.
