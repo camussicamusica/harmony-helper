@@ -49,6 +49,15 @@ interface Props {
   highlightChords?: number[];
   /** Scroll the score to this chord (nonce makes repeated requests work). */
   focusChord?: { index: number; nonce: number } | null;
+  /** Measure numbers she marked as hard (Recorrido): drawn as amber boxes. */
+  hardMeasures?: number[];
+  /** While true, clicking a measure adds / removes it from the hard list. */
+  markMode?: boolean;
+  onToggleHardMeasure?: (measure: number) => void;
+  /** One measure to emphasize (selected in the Recorrido list). */
+  highlightMeasure?: number | null;
+  /** Scroll the score to this measure (nonce makes repeated requests work). */
+  focusMeasure?: { measure: number; nonce: number } | null;
 }
 
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -88,12 +97,18 @@ export function ScoreView({
   showChordMarks = false,
   highlightChords = [],
   focusChord = null,
+  hardMeasures = [],
+  markMode = false,
+  onToggleHardMeasure,
+  highlightMeasure = null,
+  focusMeasure = null,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const overlayRef = useRef<SVGSVGElement | null>(null);
   const chordSvgRef = useRef<SVGSVGElement | null>(null);
+  const hardSvgRef = useRef<SVGSVGElement | null>(null);
   const osmdRef = useRef<any>(null);
   const readyRef = useRef(false);
   const cleanupRef = useRef<Array<() => void>>([]);
@@ -122,6 +137,14 @@ export function ScoreView({
   showChordMarksRef.current = showChordMarks;
   const highlightRef = useRef(highlightChords);
   highlightRef.current = highlightChords;
+  const hardRef = useRef(hardMeasures);
+  hardRef.current = hardMeasures;
+  const highlightMeasureRef = useRef(highlightMeasure);
+  highlightMeasureRef.current = highlightMeasure;
+  const markModeRef = useRef(markMode);
+  markModeRef.current = markMode;
+  const onToggleHardRef = useRef(onToggleHardMeasure);
+  onToggleHardRef.current = onToggleHardMeasure;
   /** Top staff line (px, relative to the wrapper) of each system id. */
   const systemTopRef = useRef<Map<number, number>>(new Map());
   const fitRef = useRef(1);
@@ -321,6 +344,107 @@ export function ScoreView({
       g.appendChild(t);
       svg.appendChild(g);
     });
+  };
+
+  /** Box (px, relative to the wrapper) of every measure that has notes: x from the neighbours' midpoints, y over the system. */
+  const measureBoxes = (): Map<number, { x0: number; x1: number; y0: number; y1: number }> => {
+    const out = new Map<number, { x0: number; x1: number; y0: number; y1: number }>();
+    const bySys = new Map<number, Map<number, { min: number; max: number }>>();
+    const ySys = new Map<number, { min: number; max: number }>();
+    for (const n of notesRef.current) {
+      if (n.cx === undefined || n.cy === undefined) continue;
+      const sys = n.system ?? 0;
+      const ms = bySys.get(sys) ?? new Map<number, { min: number; max: number }>();
+      const e = ms.get(n.measure);
+      if (e) {
+        e.min = Math.min(e.min, n.cx);
+        e.max = Math.max(e.max, n.cx);
+      } else ms.set(n.measure, { min: n.cx, max: n.cx });
+      bySys.set(sys, ms);
+      const y = ySys.get(sys);
+      if (y) {
+        y.min = Math.min(y.min, n.cy);
+        y.max = Math.max(y.max, n.cy);
+      } else ySys.set(sys, { min: n.cy, max: n.cy });
+    }
+    for (const [sys, ms] of bySys) {
+      const list = [...ms.entries()].sort((a, b) => a[1].min - b[1].min);
+      const yr = ySys.get(sys)!;
+      const top = systemTopRef.current.get(sys);
+      const y0 = (top !== undefined ? Math.min(top, yr.min - 8) : yr.min - 30) - 8;
+      const y1 = yr.max + 30;
+      list.forEach(([num, r], i) => {
+        const x0 = i === 0 ? r.min - 26 : (list[i - 1][1].max + r.min) / 2;
+        const x1 = i === list.length - 1 ? r.max + 26 : (r.max + list[i + 1][1].min) / 2;
+        out.set(num, { x0, x1, y0, y1 });
+      });
+    }
+    return out;
+  };
+
+  /** "Marcar compás difícil": amber boxes over the marked measures (and a pulse on the selected one). */
+  const drawHard = () => {
+    const svg = hardSvgRef.current;
+    const wrap = wrapRef.current;
+    if (!svg || !wrap) return;
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    svg.setAttribute("width", String(wrap.offsetWidth));
+    svg.setAttribute("height", String(wrap.offsetHeight));
+    const hard = hardRef.current;
+    const sel = highlightMeasureRef.current;
+    const wanted = new Set<number>(hard);
+    if (sel !== null) wanted.add(sel);
+    if (!wanted.size) return;
+    const boxes = measureBoxes();
+    const AMBER = "#D97706";
+    for (const m of wanted) {
+      const b = boxes.get(m);
+      if (!b) continue;
+      const isHard = hard.includes(m);
+      const lit = sel === m;
+      const g = svgEl("g", {});
+      const r = svgEl("rect", {
+        x: b.x0 + 2,
+        y: b.y0,
+        width: Math.max(8, b.x1 - b.x0 - 4),
+        height: b.y1 - b.y0,
+        rx: 6,
+        fill: AMBER,
+        "fill-opacity": lit ? 0.22 : 0.12,
+        stroke: AMBER,
+        "stroke-width": lit ? 3 : 1.5,
+        ...(isHard && !lit ? { "stroke-dasharray": "5 4" } : {}),
+      });
+      if (lit) {
+        r.appendChild(svgEl("animate", { attributeName: "stroke-opacity", values: "1;0.35;1", dur: "1.4s", repeatCount: "indefinite" }));
+      }
+      g.appendChild(r);
+      if (isHard) {
+        const label = `comp. ${m}`;
+        const w = 12 + label.length * 5.4;
+        g.appendChild(svgEl("rect", { x: b.x0 + 6, y: b.y1 - 17, width: w, height: 14, rx: 7, fill: AMBER }));
+        const t = svgEl("text", { x: b.x0 + 6 + w / 2, y: b.y1 - 7, "text-anchor": "middle", "font-size": 9.5, "font-weight": 700, fill: "#ffffff" });
+        t.textContent = label;
+        g.appendChild(t);
+      }
+      svg.appendChild(g);
+    }
+  };
+
+  /** Click in "Marcar compás difícil" mode: which measure is under the pointer? */
+  const onWrapClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!markModeRef.current || !onToggleHardRef.current) return;
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    const wr = wrap.getBoundingClientRect();
+    const x = e.clientX - wr.left;
+    const y = e.clientY - wr.top;
+    for (const [m, b] of measureBoxes()) {
+      if (x >= b.x0 && x < b.x1 && y >= b.y0 && y <= b.y1) {
+        onToggleHardRef.current(m);
+        return;
+      }
+    }
   };
 
   const xAt = (t: number): number | null => {
@@ -533,6 +657,7 @@ export function ScoreView({
     measure(notesRef.current);
     drawLine();
     drawChords();
+    drawHard();
   };
 
   /** Render OSMD. In Tocar the zoom is fitted to the band height (zoom slider multiplies on top). */
@@ -597,6 +722,7 @@ export function ScoreView({
 
     drawLine();
     drawChords();
+    drawHard();
     notesOut(notes);
     try {
       onScoreDataRef.current?.(notes, readScoreMeta(osmd, bpmRef.current));
@@ -736,6 +862,7 @@ export function ScoreView({
     let timer: ReturnType<typeof setTimeout> | null = null;
     const unsub = subscribeColors(() => {
       drawChords(); // chord role colors may have changed
+      drawHard();
       const sig = noteSignature();
       const intSig = intervalSignature();
       if (intSig !== lastIntSig) {
@@ -777,6 +904,7 @@ export function ScoreView({
       onNotesRef.current(notes);
       onScoreDataRef.current?.(notes, readScoreMeta(osmd, bpm));
       drawChords();
+      drawHard();
     } catch (e) {
       console.error("BPM recompute failed:", e);
     }
@@ -794,8 +922,32 @@ export function ScoreView({
   // Chord marks / highlight — redraw the chord overlay.
   useEffect(() => {
     drawChords();
+    drawHard();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chordMarks, showChordMarks, highlightChords]);
+
+  // Hard measures / selected measure — redraw the amber boxes.
+  useEffect(() => {
+    drawHard();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hardMeasures, highlightMeasure]);
+
+  // Scroll the score to a measure (Recorrido, step 6).
+  useEffect(() => {
+    if (!focusMeasure) return;
+    const sc = scrollRef.current;
+    const wrap = wrapRef.current;
+    const b = measureBoxes().get(focusMeasure.measure);
+    if (!b || !sc || !wrap) return;
+    if (viewRef.current === "tocar") {
+      holdUntilRef.current = performance.now() + 2500;
+      sc.scrollTo({ left: Math.max(0, b.x0 - NOW_LINE_FRACTION * sc.clientWidth), behavior: "smooth" });
+    } else {
+      const top = wrap.getBoundingClientRect().top + window.scrollY + b.y0 - 150;
+      window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusMeasure]);
 
   // Scroll the score to a chord (Estudiar: page scroll; Tocar: band scroll under the "now" line).
   useEffect(() => {
@@ -891,7 +1043,8 @@ export function ScoreView({
       >
         <div
           ref={wrapRef}
-          className="relative"
+          onClick={onWrapClick}
+          className={markMode ? "relative cursor-crosshair" : "relative"}
           style={
             tocar
               ? {
@@ -913,6 +1066,7 @@ export function ScoreView({
           />
           <svg ref={overlayRef} className="pointer-events-none absolute left-0 top-0" />
           <svg ref={chordSvgRef} className="pointer-events-none absolute left-0 top-0" />
+          <svg ref={hardSvgRef} className="pointer-events-none absolute left-0 top-0" />
         </div>
       </div>
 

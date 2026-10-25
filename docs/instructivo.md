@@ -287,7 +287,9 @@ La app adivina los acordes por las notas que suenan. Si se equivoca, la pieza pu
 
 **Lo que hace hoy:** la app te escucha tocar. Las teclas que apretás se iluminan en el piano de la pantalla y la app te dice qué nota tocaste y, si tocás 3 o más juntas, qué acorde es.
 
-**Lo que no hace todavía:** esperar a que toques la nota correcta antes de avanzar, repetir un tramo (loop), velocidades fijas de 50 / 75 / 100% (solo está la barra "Tempo"). Eso viene después.
+**Lo que hace además:** en el "Recorrido de la pieza" (paso 3) la app escucha si tocás la escala y el acorde de tónica de tu pieza.
+
+**Lo que no hace todavía:** esperar a que toques la nota correcta antes de avanzar, repetir un tramo cualquiera (solo repite un compás marcado, en el paso 6 del Recorrido), velocidades fijas de 50 / 75 / 100% (solo está la barra "Tempo"). Eso viene después.
 
 Usá **Chrome**. Otros navegadores no tienen MIDI.
 
@@ -329,6 +331,81 @@ Usá **Chrome**. Otros navegadores no tienen MIDI.
 
 ---
 
+## Recorrido de la pieza
+
+**Recorrido:** un camino de 11 pasos para una pieza nueva, de a uno. Cada paso abre la herramienta justa. No hace falta hacerlo todo el mismo día. Saltear un paso o un día no rompe nada.
+
+El panel se abre a la **izquierda** y no tapa la partitura: la empuja hacia la derecha. Se puede tener abierto a la vez que la Ficha.
+
+### Abrirlo
+
+1. Tocá "Recorrido" (arriba a la derecha, al lado de "Ficha").
+2. Se abre el panel "Recorrido de la pieza".
+3. Para cerrarlo, tocá la "X" del panel o tocá "Recorrido" otra vez.
+
+### Dos formas de verlo
+
+1. Arriba del panel hay dos botones: "De a uno" y "Ver todo".
+2. **"De a uno"** (es la que viene prendida): muestra un solo paso, con su título, la sala (Entender / Leer / Hablar / Escribir / Oído / Repaso), el tiempo sugerido y 4 instrucciones numeradas.
+3. Abajo del paso hay tres botones: "Anterior", "Listo" y "Siguiente". "Listo" marca el paso como hecho y pasa al próximo. Si el paso ya está hecho, el botón dice "Hecho"; tocalo para sacar la marca.
+4. Arriba del paso hay 11 puntitos. Tocá uno para saltar a ese paso. Verde = hecho. El que tiene aro negro es el actual.
+5. **"Ver todo"**: una lista chica con todos los pasos, agrupados por día (Día 1, Día 2 … y "Siempre"). Cada fila tiene un cuadradito para tildar "hecho". Tocá el nombre de un paso para abrirlo en "De a uno".
+
+### Qué se guarda
+
+1. La app guarda, para cada partitura, los pasos hechos, el paso actual y los compases difíciles que marcaste.
+2. Se guarda en este navegador. Si abrís otra partitura, ves su propio recorrido.
+3. Para borrar solo el recorrido de esta pieza: tocá "Empezar de nuevo" (abajo del panel) y confirmá con "Empezar de nuevo". Las otras piezas no se tocan.
+
+### Los pasos que abren una herramienta
+
+1. **Paso 1, "Mirar la Ficha, sin tocar":** tocá "Abrir la Ficha". Se abre la Ficha con "Tonalidad", "Escala" y "Acordes de la escala" abiertas.
+2. **Paso 2, "Solo el ritmo":** tocá "Ir a Tocar al 60%". Pasa a "Tocar" y baja el tempo al 60% del que tenías. Aparece "Tempo: 54 bpm (antes 90)" y un botón "Volver a 90 bpm".
+3. **Paso 3, "Escala y acorde de tónica":** tocá "Abrir la escala". Se abre la Ficha en "Escala". Más abajo, en el panel, está el chequeo con el teclado (ver abajo).
+4. **Paso 5, "Leer toda la pieza en trozos":** tocá "Ir a Estudiar". Después usá "Marcar compás difícil" (ver abajo).
+5. **Paso 6, "Solo los puntos difíciles":** el panel lista tus compases marcados (ver abajo).
+6. **Paso 7, "Los acordes de la pieza":** tocá "Abrir el Círculo". Se abre la Ficha en "Círculo", con "Pieza" elegida.
+
+### Marcar un compás difícil (paso 5)
+
+1. En el paso 5, tocá "Marcar compás difícil". El botón pasa a decir "Listo de marcar".
+2. Tocá un compás de la partitura. Se le dibuja un recuadro ámbar con "comp. 2" (o el número que sea).
+3. Tocá el mismo compás otra vez para sacar la marca. También podés tocar la "X" de su etiqueta en la lista del panel.
+4. Tocá "Listo de marcar" cuando termines.
+5. Con 2 o 3 compases alcanza.
+
+Los compases marcados se ven en "Tocar" y en "Estudiar". Un compás que solo tiene silencios no se puede marcar.
+
+### Practicar los compases marcados (paso 6)
+
+1. En el paso 6 ves "Tus compases difíciles".
+2. Tocá el nombre de uno ("compás 4"). La partitura se mueve hasta ese compás y se lo ve resaltado.
+3. Tocá "Repetir". Ese compás suena una y otra vez. El botón pasa a decir "Parar".
+4. Tocá "Parar" (o "Detener" arriba) para cortar.
+5. Si no marcaste ninguno, el panel te lo dice y tiene un botón "Ir al paso 5".
+
+### Chequeo con el teclado (paso 3)
+
+Es el primer ejercicio donde la app te escucha. Hay dos tareas, una abajo de la otra.
+
+1. Conectá el teclado MIDI (sección 9). Si no está conectado, el panel tiene el botón "Conectar teclado MIDI".
+2. **Primera tarea:** "Tocá la escala de Sol mayor subiendo, una octava." (dice la tonalidad de tu pieza).
+3. Tocá las notas de la escala, una por una, de abajo para arriba. Sirve cualquier octava y cualquier mano.
+4. Cada nota correcta ilumina su cuadradito, con tu color de nota. Hay 7 grados más el 8, la tónica de arriba.
+5. Si tocás una nota que no va, sale un aviso amable, por ejemplo "Esa es Fa (F); la escala usa Fa# (F#)." No se borra lo que ya tocaste: seguí desde donde estabas.
+6. Termina cuando tocás del 1 al 7 y la tónica de arriba, en orden. Aparece "Salió la escala."
+7. **Segunda tarea:** "Tocá el acorde de tónica (Sol mayor) todo junto."
+8. Apretá las tres notas a la vez. Sirve cualquier orden de las notas y cualquier octava.
+9. Si falta o sobra una nota, el panel lo dice ("Falta: Re (D)"). Termina cuando las notas que suenan son justo las del acorde: "Salió el acorde."
+10. "Otra vez" repite la tarea.
+11. **Sin teclado:** tocá "Lo hice ✓" debajo de cada tarea.
+
+### Pasos que todavía no tienen herramienta
+
+Los pasos 4 (oído interno), 8 (improvisar), 9 (sacar un motivo), 10 (componer) y 11 (tarjetas) muestran sus 4 instrucciones para hacer a mano y esta línea: "Esta herramienta todavía no existe en la app; por ahora hacelo así."
+
+---
+
 ## 10. Problemas comunes
 
 1. **La pantalla está en blanco, o no se ve la partitura:**
@@ -342,7 +419,7 @@ Usá **Chrome**. Otros navegadores no tienen MIDI.
 7. **No veo las etiquetas de los saltos:** pasá el mouse por la línea, o prendé "Etiquetas siempre" dentro de "Capas".
 8. **No veo la fila "Capas":** tocá "Capas". Empieza cerrada. Y "Línea melódica" tiene que estar prendida.
 9. **La barra de arriba tapa la partitura:** en ventanas angostas ocupa mucho lugar. Hacé la ventana del navegador más ancha, o cerrá "Capas".
-10. **La Ficha tapa la partitura:** el panel se abre sobre la derecha. Hacé la ventana más ancha, o cerrá la Ficha con la "X".
+10. **La Ficha tapa la partitura:** el panel se abre sobre la derecha. Hacé la ventana más ancha, o cerrá la Ficha con la "X". El "Recorrido" se abre a la izquierda y corre la partitura, pero con los dos abiertos queda poco lugar.
 11. **Perdí mis colores:** están guardados en este navegador. Si abrís la app en otro navegador o con otra dirección (otro número de puerto), no aparecen. Por eso conviene usar "Exportar" de vez en cuando.
 12. **El piano no aparece:** en "Estudiar" está escondido. Tocá "Mostrar teclado".
 
@@ -354,7 +431,15 @@ Usá **Chrome**. Otros navegadores no tienen MIDI.
 2. **Laboratorio de acordes:** es una idea guardada. No está hecho.
 3. **Análisis que se despliega al hacer clic:** idea guardada. No está hecho.
 4. **Leer PDF:** no existe (sección 2). La app te lo dice.
-5. **Esperar tu nota (modo "esperar"), repetir un tramo y velocidades 50/75/100%:** no existen (sección 9). El teclado MIDI ya se conecta y se ve.
+5. **Esperar tu nota (modo "esperar"), repetir un tramo cualquiera y velocidades 50/75/100%:** no existen (sección 9). El teclado MIDI ya se conecta y se ve. Lo único que se repite es un compás marcado como difícil (paso 6 del Recorrido).
 6. **Buscador de patrones** (motivos que se repiten): estaba en el plan inicial. No lo encontré en la pantalla. Solo existen los colores "Patterns" en el estudio, sin uso visible.
 7. **Biblioteca de partituras guardadas:** estaba en el plan inicial. No existe. Cada vez que abrís la app, vuelve a aparecer la pieza de ejemplo.
 8. **Saltar a un compás durante la reproducción:** no existe. En "Tocar", la partitura solo se mueve sola.
+9. **Herramientas del Recorrido que faltan** (el Recorrido ya existe; estos pasos todavía se hacen a mano):
+   - Paso 4: **oído interno** (cantar el primer compás por dentro).
+   - Paso 7: **flash de acordes** y **tonos guía**. Hoy el paso solo abre el Círculo.
+   - Paso 8: **improvisar con 3 reglas**.
+   - Paso 9: **eco y esquemas** (sacar un motivo y cambiarlo).
+   - Paso 10: **componer 4 compases**.
+   - Paso 11: **tarjetas** que se tocan, repetidas a días espaciados.
+10. **Ubicar la pieza en el círculo de quintas** (parte del paso 3): no existe, ver el punto 1.

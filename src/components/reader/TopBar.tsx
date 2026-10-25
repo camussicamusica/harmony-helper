@@ -9,7 +9,7 @@ import { LINE_MODES, type LineColorMode } from "@/lib/music/lineMode";
 import { UploadZone } from "./UploadZone";
 import { MidiControl } from "./MidiControl";
 import { useLayersOpen } from "@/lib/music/analysis/useFicha";
-import { ChevronDown, Keyboard, Layers, ListMusic, Minus, Pause, Play, Plus, Square } from "lucide-react";
+import { ChevronDown, Keyboard, Layers, ListMusic, Minus, Pause, Play, Plus, Route, Square } from "lucide-react";
 
 interface Props {
   isPlaying: boolean;
@@ -22,6 +22,8 @@ interface Props {
   lineMode: LineColorMode;
   showKeyboard: boolean;
   fichaOpen: boolean;
+  recorridoOpen: boolean;
+  onRecorridoToggle: () => void;
   onFichaToggle: () => void;
   onPlay: () => void;
   onPause: () => void;
@@ -48,6 +50,8 @@ export function TopBar({
   lineMode,
   showKeyboard,
   fichaOpen,
+  recorridoOpen,
+  onRecorridoToggle,
   onFichaToggle,
   onPlay,
   onPause,
@@ -151,6 +155,15 @@ export function TopBar({
 
       <div className="ml-auto flex items-center gap-2">
         <UploadZone onScoreLoaded={onScoreLoaded} />
+        <Button
+          size="sm"
+          variant={recorridoOpen ? "secondary" : "outline"}
+          className="gap-1"
+          aria-pressed={recorridoOpen}
+          onClick={onRecorridoToggle}
+        >
+          <Route className="h-4 w-4" /> Recorrido
+        </Button>
         <Button
           size="sm"
           variant={fichaOpen ? "secondary" : "outline"}

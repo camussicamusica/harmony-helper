@@ -140,12 +140,8 @@ export function clearSchedule() {
   clearScoreHighlights();
 }
 
-export async function play() {
-  await Tone.start();
-  const samp = await getSampler();
-  clearSchedule();
-
-  for (const note of currentNotes) {
+function scheduleNotes(samp: Tone.Sampler, notes: ScheduledNote[]) {
+  for (const note of notes) {
     const id = Tone.getTransport().schedule((time) => {
       if (!shouldPlay(note.hand)) return;
       const freq = Tone.Frequency(note.midi, "midi").toFrequency();
@@ -161,8 +157,31 @@ export async function play() {
     }, note.startSec);
     scheduledIds.push(id);
   }
+}
 
+export async function play() {
+  await Tone.start();
+  const samp = await getSampler();
+  clearSchedule();
+  Tone.getTransport().loop = false;
+  scheduleNotes(samp, currentNotes);
   Tone.getTransport().start();
+}
+
+/** Plays only [startSec, endSec) and repeats it until stop(). Notes that begin inside the range are played. */
+export async function playRange(startSec: number, endSec: number) {
+  await Tone.start();
+  const samp = await getSampler();
+  clearSchedule();
+  const tr = Tone.getTransport();
+  tr.stop();
+  scheduleNotes(
+    samp,
+    currentNotes.filter((n) => n.startSec >= startSec - 1e-3 && n.startSec < endSec - 1e-3),
+  );
+  tr.setLoopPoints(startSec, endSec);
+  tr.loop = true;
+  tr.start(undefined, startSec);
 }
 
 export function pause() {
@@ -172,6 +191,7 @@ export function pause() {
 export function stop() {
   try {
     Tone.getTransport().stop();
+    Tone.getTransport().loop = false;
     Tone.getTransport().position = 0;
   } catch {
     /* transport may be disposed */

@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronDown, Play, Square } from "lucide-react";
 import { ChordCircle, type CircleChord } from "@/components/analysis/ChordCircle";
 import { roleColor } from "@/lib/colors/roleColor";
@@ -34,12 +34,43 @@ interface Props {
   highlight: ChordHighlight;
   onHighlightChange: (h: ChordHighlight) => void;
   onFocusChord: (index: number) => void;
+  /** Asked by the Recorrido: open exactly these sections (and the Círculo source). nonce makes repeats work. */
+  focus?: FichaFocus | null;
 }
 
-function Section({ title, defaultOpen = true, children }: { title: string; defaultOpen?: boolean; children: ReactNode }) {
+export interface FichaFocus {
+  nonce: number;
+  sections: SectionTitle[];
+  circleSource?: "scale" | "piece";
+}
+
+export type SectionTitle = "Tonalidad" | "Escala" | "Círculo" | "Acordes de la escala" | "Acordes de la pieza";
+
+function Section({
+  title,
+  defaultOpen = true,
+  focus,
+  children,
+}: {
+  title: SectionTitle;
+  defaultOpen?: boolean;
+  focus?: FichaFocus | null;
+  children: ReactNode;
+}) {
   const [open, setOpen] = useState(defaultOpen);
+  const ref = useRef<HTMLDivElement | null>(null);
+  const nonce = focus?.nonce;
+  useEffect(() => {
+    if (!focus) return;
+    const want = focus.sections.includes(title);
+    setOpen(want);
+    if (want && focus.sections[0] === title) {
+      requestAnimationFrame(() => ref.current?.scrollIntoView({ block: "start", behavior: "smooth" }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nonce]);
   return (
-    <Collapsible open={open} onOpenChange={setOpen} className="rounded-lg border border-border">
+    <Collapsible ref={ref} open={open} onOpenChange={setOpen} className="rounded-lg border border-border">
       <CollapsibleTrigger className="flex w-full items-center justify-between px-3 py-2 text-sm font-semibold">
         {title}
         <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
@@ -62,6 +93,7 @@ export function FichaPanel({
   highlight,
   onHighlightChange,
   onFocusChord,
+  focus = null,
 }: Props) {
   const { palette } = useColors(); // re-render when she repaints roles
   const roles = palette.roles;
@@ -152,6 +184,11 @@ export function FichaPanel({
   const listenResolution = () => {
     if (circleChord && tonicTriad) void playChordsInOrder([voiceChordMidi(circleChord.pcs), voiceChordMidi(tonicTriad.pcs)]);
   };
+  const focusNonce = focus?.nonce;
+  useEffect(() => {
+    if (focus?.circleSource) setCircleSource(focus.circleSource);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusNonce]);
   const keyId = key?.id;
   useEffect(() => {
     setScaleIdx(0);
@@ -178,7 +215,7 @@ export function FichaPanel({
         ) : (
           <>
             {/* a. Tonalidad */}
-            <Section title="Tonalidad">
+            <Section title="Tonalidad" focus={focus}>
               <div className="text-2xl font-semibold leading-tight">{key.label}</div>
               <div className="mt-0.5 text-sm text-muted-foreground">{confidenceText()}</div>
               {detection && !ficha.overridden && detection.mode.differs && (
@@ -203,7 +240,7 @@ export function FichaPanel({
             </Section>
 
             {/* b. Escala */}
-            <Section title="Escala">
+            <Section title="Escala" focus={focus}>
               <ScaleStrip
                 keyNotes={key.notes}
                 pcs={key.pcs}
@@ -226,7 +263,7 @@ export function FichaPanel({
 
             {/* b2. Círculo */}
             {circleChord && (
-              <Section title="Círculo">
+              <Section title="Círculo" focus={focus}>
                 <div className="mb-2 flex items-center gap-1 text-xs" role="group" aria-label="Qué acordes recorrer">
                   {(["scale", "piece"] as const).map((s) => (
                     <button
@@ -279,7 +316,7 @@ export function FichaPanel({
             )}
 
             {/* c. Acordes de la escala */}
-            <Section title="Acordes de la escala">
+            <Section title="Acordes de la escala" focus={focus}>
               <label className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
                 <Switch checked={useSevenths} onCheckedChange={setUseSevenths} />
                 <span className={useSevenths ? "italic text-foreground" : ""}>Con séptima</span>
@@ -332,7 +369,7 @@ export function FichaPanel({
             </Section>
 
             {/* d. Acordes de la pieza */}
-            <Section title="Acordes de la pieza">
+            <Section title="Acordes de la pieza" focus={focus}>
               <label className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
                 <Switch checked={showChordMarks} onCheckedChange={onShowChordMarksChange} />
                 <span className={showChordMarks ? "italic text-foreground" : ""}>Acordes sobre la partitura</span>

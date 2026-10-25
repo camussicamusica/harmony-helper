@@ -2,8 +2,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { TopBar } from "./TopBar";
 import { ScoreView } from "./ScoreView";
 import { PianoView } from "./PianoView";
-import { FichaPanel } from "@/components/analysis/FichaPanel";
+import { FichaPanel, type FichaFocus } from "@/components/analysis/FichaPanel";
+import { RecorridoPanel } from "@/components/recorrido/RecorridoPanel";
+import { useRecorrido } from "@/lib/music/recorrido/useRecorrido";
+import type { StepAction } from "@/lib/music/recorrido/steps";
 import {
+  hashText,
   highlightedIndices,
   useChordOverlayPref,
   useFicha,
@@ -17,6 +21,7 @@ import {
   loadNotes,
   pause,
   play,
+  playRange,
   setIsolation,
   stop,
 } from "@/lib/music/scheduler";
@@ -45,7 +50,17 @@ export function ReaderPage() {
   const [showChordMarks, setShowChordMarks] = useChordOverlayPref();
   const [highlight, setHighlight] = useState<ChordHighlight>(null);
   const [focusChord, setFocusChord] = useState<{ index: number; nonce: number } | null>(null);
-  const ficha = useFicha(xml, scoreData, bpm, fichaOpen || showChordMarks);
+  const [recorridoOpen, setRecorridoOpen] = useState(false);
+  const [fichaFocus, setFichaFocus] = useState<FichaFocus | null>(null);
+  const [markMode, setMarkMode] = useState(false);
+  const [selectedMeasure, setSelectedMeasure] = useState<number | null>(null);
+  const [focusMeasure, setFocusMeasure] = useState<{ measure: number; nonce: number } | null>(null);
+  const [loopMeasure, setLoopMeasure] = useState<number | null>(null);
+  /** Tempo before "Recorrido" step 2 slowed it down. */
+  const [slowFrom, setSlowFrom] = useState<number | null>(null);
+  const scoreHash = useMemo(() => hashText(xml), [xml]);
+  const recorrido = useRecorrido(scoreHash);
+  const ficha = useFicha(xml, scoreData, bpm, fichaOpen || showChordMarks || recorridoOpen);
   const highlightIdx = useMemo(() => highlightedIndices(highlight, ficha.chords), [highlight, ficha.chords]);
 
   const handleScoreData = useCallback((notes: ScheduledNote[], meta: ScoreMeta) => {
@@ -85,6 +100,7 @@ export function ReaderPage() {
   }, [isolation]);
 
   const handlePlay = async () => {
+    setLoopMeasure(null);
     setIsPlaying(true);
     await play();
   };
@@ -93,6 +109,7 @@ export function ReaderPage() {
     setIsPlaying(false);
   };
   const handleStop = () => {
+    setLoopMeasure(null);
     stop();
     clearSchedule();
     setIsPlaying(false);
@@ -101,6 +118,7 @@ export function ReaderPage() {
   const handleBpmChange = (v: number) => {
     setBpm(v);
     if (isPlaying) {
+      setLoopMeasure(null);
       stop();
       setIsPlaying(false);
     }
@@ -112,7 +130,69 @@ export function ReaderPage() {
     setScoreData(null);
     setHighlight(null);
     setFocusChord(null);
+    setMarkMode(false);
+    setSelectedMeasure(null);
+    setFocusMeasure(null);
+    setSlowFrom(null);
     setScoreVersion((v) => v + 1);
+  };
+
+  const openFicha = (f: Omit<FichaFocus, "nonce">) => {
+    setFichaFocus({ ...f, nonce: Date.now() });
+    setFichaOpen(true);
+  };
+
+  const slowTempo = () => {
+    const base = slowFrom ?? bpm;
+    setSlowFrom(base);
+    handleBpmChange(Math.max(40, Math.round(base * 0.6)));
+  };
+
+  const restoreTempo = () => {
+    if (slowFrom === null) return;
+    handleBpmChange(slowFrom);
+    setSlowFrom(null);
+  };
+
+  const runAction = (kind: StepAction) => {
+    switch (kind) {
+      case "ficha-tonalidad":
+        openFicha({ sections: ["Tonalidad", "Escala", "Acordes de la escala"] });
+        break;
+      case "tocar-lento":
+        setView("tocar");
+        slowTempo();
+        break;
+      case "ficha-escala":
+        openFicha({ sections: ["Escala"] });
+        break;
+      case "estudiar":
+        setView("estudiar");
+        break;
+      case "ficha-circulo":
+        openFicha({ sections: ["Círculo"], circleSource: "piece" });
+        break;
+    }
+  };
+
+  const selectMeasure = (m: number) => {
+    setSelectedMeasure(m);
+    setFocusMeasure({ measure: m, nonce: Date.now() });
+  };
+
+  const toggleLoop = async (m: number) => {
+    if (loopMeasure === m) {
+      handleStop();
+      return;
+    }
+    const span = ficha.meta.measures.find((x) => x.number === m);
+    selectMeasure(m);
+    if (!span) return; // no timing for this measure: scrolling and highlight still work
+    stop();
+    clearSchedule();
+    setLoopMeasure(m);
+    setIsPlaying(true);
+    await playRange(span.startSec, span.endSec);
   };
 
   const clampZoom = (z: number) => Math.max(0.5, Math.min(2.5, Math.round(z * 100) / 100));
@@ -124,7 +204,7 @@ export function ReaderPage() {
     <div
       className={`flex flex-col bg-background font-sans antialiased ${
         tocar ? "h-screen overflow-hidden" : "min-h-screen"
-      }`}
+      } ${recorridoOpen ? "sm:pl-[340px]" : ""}`}
     >
       <TopBar
         isPlaying={isPlaying}
@@ -138,6 +218,8 @@ export function ReaderPage() {
         showKeyboard={showKeyboard}
         fichaOpen={fichaOpen}
         onFichaToggle={() => setFichaOpen((v) => !v)}
+        recorridoOpen={recorridoOpen}
+        onRecorridoToggle={() => setRecorridoOpen((v) => !v)}
         onPlay={handlePlay}
         onPause={handlePause}
         onStop={handleStop}
@@ -171,6 +253,11 @@ export function ReaderPage() {
               showChordMarks={showChordMarks}
               highlightChords={highlightIdx}
               focusChord={focusChord}
+              hardMeasures={recorrido.progress.hard}
+              markMode={markMode}
+              onToggleHardMeasure={recorrido.toggleHard}
+              highlightMeasure={selectedMeasure !== null && recorrido.progress.hard.includes(selectedMeasure) ? selectedMeasure : null}
+              focusMeasure={focusMeasure}
             />
           )}
         </section>
@@ -193,6 +280,23 @@ export function ReaderPage() {
         highlight={highlight}
         onHighlightChange={setHighlight}
         onFocusChord={(index) => setFocusChord({ index, nonce: Date.now() })}
+        focus={fichaFocus}
+      />
+      <RecorridoPanel
+        open={recorridoOpen}
+        onOpenChange={setRecorridoOpen}
+        recorrido={recorrido}
+        keyInfo={ficha.key}
+        bpm={bpm}
+        slowFrom={slowFrom}
+        markMode={markMode}
+        onMarkModeChange={setMarkMode}
+        selectedMeasure={selectedMeasure}
+        onSelectMeasure={selectMeasure}
+        loopMeasure={loopMeasure}
+        onToggleLoop={(m) => void toggleLoop(m)}
+        onRunAction={runAction}
+        onRestoreTempo={restoreTempo}
       />
     </div>
   );
