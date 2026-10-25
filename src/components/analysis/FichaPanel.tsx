@@ -1,5 +1,7 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { ChevronDown, Play, Square } from "lucide-react";
+import { ChordCircle, type CircleChord } from "@/components/analysis/ChordCircle";
+import { roleColor } from "@/lib/colors/roleColor";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -21,7 +23,7 @@ import {
 } from "@/lib/music/analysis/chords";
 import type { PieceChord } from "@/lib/music/analysis/pieceChords";
 import type { Ficha, ChordHighlight } from "@/lib/music/analysis/useFicha";
-import { playChordMidi, playNoteMidi, playSequence, stopAnalysisAudio } from "@/lib/music/analysis/audio";
+import { playChordMidi, playChordsInOrder, playNoteMidi, playSequence, stopAnalysisAudio } from "@/lib/music/analysis/audio";
 
 interface Props {
   open: boolean;
@@ -50,8 +52,6 @@ function Section({ title, defaultOpen = true, children }: { title: string; defau
 /** Shorter quality words for the small circles. */
 const SHORT_Q: Record<string, string> = { disminuido: "dism.", aumentado: "aum." };
 
-const roleColor = (roles: { id: string; color: string }[], id: string, fallback = "#9CA3AF") =>
-  roles.find((r) => r.id === id)?.color ?? fallback;
 
 export function FichaPanel({
   open,
@@ -68,6 +68,9 @@ export function FichaPanel({
   const { key, detection, triads, sevenths, chords } = ficha;
   const [useSevenths, setUseSevenths] = useState(false);
   const [listening, setListening] = useState<number | null>(null);
+  const [circleSource, setCircleSource] = useState<"scale" | "piece">("scale");
+  const [scaleIdx, setScaleIdx] = useState(0);
+  const [pieceIdx, setPieceIdx] = useState(0);
 
   const scale = useSevenths ? sevenths : triads;
   const countByDegree = new Map<number, number>();
@@ -101,15 +104,59 @@ export function FichaPanel({
   };
 
   const playScaleChord = (c: ScaleChord) => {
+    setCircleSource("scale");
+    setScaleIdx(c.degree - 1);
     void playChordMidi(voiceChordMidi(c.pcs));
     onHighlightChange(highlight?.kind === "degree" && highlight.degree === c.degree ? null : { kind: "degree", degree: c.degree });
   };
 
   const clickPieceChord = (i: number, c: PieceChord) => {
+    setCircleSource("piece");
+    setPieceIdx(i);
     void playChordMidi(voiceChordMidi(c.pcs));
     onHighlightChange({ kind: "chord", index: i });
     onFocusChord(i);
   };
+
+  // ---- Círculo: the chord being drawn ----
+  const source = circleSource === "piece" && chords.length > 0 ? "piece" : "scale";
+  const sIdx = Math.min(scaleIdx, Math.max(scale.length - 1, 0));
+  const pIdx = Math.min(pieceIdx, Math.max(chords.length - 1, 0));
+  const idx = source === "piece" ? pIdx : sIdx;
+  const count = source === "piece" ? chords.length : scale.length;
+  const sc = scale[sIdx];
+  const pc = chords[pIdx];
+  const circleChord: CircleChord | null =
+    source === "piece" && pc
+      ? { name: pc.name, notes: pc.notes, pcs: pc.pcs, rootPc: pc.rootPc, roleId: pc.roleId, fn: pc.fn, inScale: pc.inScale }
+      : sc
+        ? { name: sc.name, notes: sc.notes, pcs: sc.pcs, rootPc: sc.rootPc, roleId: sc.roleId, fn: sc.fn, inScale: true }
+        : null;
+  const tonicTriad = triads[0];
+  const isDominant = !!circleChord && circleChord.inScale && circleChord.fn === "D";
+
+  const stepCircle = (d: number) => {
+    const n = idx + d;
+    if (n < 0 || n >= count) return;
+    if (source === "piece") {
+      setPieceIdx(n);
+      onHighlightChange({ kind: "chord", index: n });
+      onFocusChord(n);
+    } else {
+      setScaleIdx(n);
+    }
+  };
+  const listenCircle = () => {
+    if (circleChord) void playChordMidi(voiceChordMidi(circleChord.pcs));
+  };
+  const listenResolution = () => {
+    if (circleChord && tonicTriad) void playChordsInOrder([voiceChordMidi(circleChord.pcs), voiceChordMidi(tonicTriad.pcs)]);
+  };
+  const keyId = key?.id;
+  useEffect(() => {
+    setScaleIdx(0);
+    setPieceIdx(0);
+  }, [keyId]);
 
   const outsideColor = roleColor(roles, "chord-outsideScale", "#78716C");
 
@@ -176,6 +223,60 @@ export function FichaPanel({
                 )}
               </Button>
             </Section>
+
+            {/* b2. Círculo */}
+            {circleChord && (
+              <Section title="Círculo">
+                <div className="mb-2 flex items-center gap-1 text-xs" role="group" aria-label="Qué acordes recorrer">
+                  {(["scale", "piece"] as const).map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      disabled={s === "piece" && chords.length === 0}
+                      aria-pressed={source === s}
+                      onClick={() => setCircleSource(s)}
+                      className={`rounded-full border px-3 py-1 font-medium disabled:opacity-40 ${source === s ? "border-foreground bg-foreground text-background" : "border-border hover:bg-accent"}`}
+                    >
+                      {s === "scale" ? "Escala" : "Pieza"}
+                    </button>
+                  ))}
+                  {source === "piece" && pc && (
+                    <span className="ml-auto text-[11px] tabular-nums text-muted-foreground">
+                      compás {pc.measure}
+                      {pc.beat > 1 ? `·${pc.beat}` : ""} · {idx + 1}/{count}
+                    </span>
+                  )}
+                  {source === "scale" && <span className="ml-auto text-[11px] tabular-nums text-muted-foreground">{sc?.roman}</span>}
+                </div>
+                <ChordCircle keyInfo={key} chord={circleChord} tonicPcs={tonicTriad?.pcs ?? []} />
+                {!circleChord.inScale && (
+                  <p className="mt-1 text-center text-xs italic text-muted-foreground">
+                    Este acorde está fuera de la escala: se dibuja con borde punteado.
+                  </p>
+                )}
+                {isDominant && (
+                  <p className="mt-1 text-center text-[11px] text-muted-foreground">
+                    Las flechas muestran hacia dónde baja o sube cada nota para llegar a casa (la más gruesa = la que más empuja).
+                  </p>
+                )}
+                <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
+                  <Button size="sm" variant="outline" disabled={idx <= 0} onClick={() => stepCircle(-1)}>
+                    ◀ Anterior
+                  </Button>
+                  <Button size="sm" variant="outline" disabled={idx >= count - 1} onClick={() => stepCircle(1)}>
+                    Siguiente ▶
+                  </Button>
+                  <Button size="sm" className="gap-1" onClick={listenCircle}>
+                    <Play className="h-3.5 w-3.5" /> Escuchar
+                  </Button>
+                  {isDominant && (
+                    <Button size="sm" variant="secondary" className="gap-1" onClick={listenResolution}>
+                      <Play className="h-3.5 w-3.5" /> Escuchar la resolución
+                    </Button>
+                  )}
+                </div>
+              </Section>
+            )}
 
             {/* c. Acordes de la escala */}
             <Section title="Acordes de la escala">

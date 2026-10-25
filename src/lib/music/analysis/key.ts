@@ -1,4 +1,4 @@
-import { Note, Scale } from "tonal";
+import { Key, Note, Scale } from "tonal";
 import { solfegeName } from "../naming";
 
 /** Krumhansl-Kessler key profiles (index 0 = tonic). */
@@ -76,13 +76,9 @@ function mod12(n: number) {
   return ((n % 12) + 12) % 12;
 }
 
-function tonicFifths(name: string): number {
-  const n = Note.get(name) as unknown as { fifths?: number };
-  return n.fifths ?? 0;
-}
-
+/** Sharps (+) or flats (−) in the key signature. Note.get() has no fifths for a bare pitch class, so ask Key. */
 function signatureOf(tonic: string, mode: KeyMode): number {
-  return tonicFifths(tonic) - (mode === "minor" ? 3 : 0);
+  return mode === "major" ? Key.majorKey(tonic).alteration : Key.minorKey(tonic).alteration;
 }
 
 /** Build the key info for a tonic name + mode. */

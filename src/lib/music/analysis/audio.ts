@@ -52,3 +52,11 @@ export async function playSequence(midis: number[], stepSec = 0.42, onStep?: (i:
   });
   if (onEnd) timers.push(setTimeout(onEnd, 50 + midis.length * stepSec * 1000 + 200));
 }
+
+/** Play chords one after the other (each a list of MIDI notes), scheduled on the Tone clock. */
+export async function playChordsInOrder(chords: number[][], gapSec = 1.2, seconds = 1.5) {
+  stopAnalysisAudio();
+  const v = await getVoice();
+  const t0 = Tone.now() + 0.02;
+  chords.forEach((c, i) => c.forEach((m) => v.triggerAttackRelease(freq(m), seconds, t0 + i * gapSec)));
+}
