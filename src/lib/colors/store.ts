@@ -22,7 +22,7 @@ function defaultPalette(name = "Mis colores"): Palette {
 }
 
 /** Add built-in roles that are missing (new releases) and fill in `enabled`. Never touches her values. */
-function mergeDefaults(p: Palette): Palette {
+export function mergeDefaults(p: Palette): Palette {
   const have = new Map(p.roles.map((r) => [r.id, r]));
   const roles: ColorRole[] = p.roles.map((r) => ({ ...r, enabled: r.enabled !== false }));
   for (const d of buildDefaultRoles()) {

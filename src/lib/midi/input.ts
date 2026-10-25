@@ -182,7 +182,7 @@ function allNotesOff() {
 }
 
 /** Handles one raw MIDI message (3 bytes). Any channel. */
-function handleBytes(data: ArrayLike<number>, time: number) {
+export function handleBytes(data: ArrayLike<number>, time: number) {
   const status = data[0] & 0xf0;
   const d1 = data[1] ?? 0;
   const d2 = data[2] ?? 0;
