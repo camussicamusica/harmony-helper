@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { FileUp, Loader2 } from "lucide-react";
+import { FileUp, Loader2, X } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { convertToMusicXml, type OmrProgress } from "@/lib/music/omrService";
 
@@ -27,7 +27,7 @@ export function UploadZone({ onScoreLoaded }: Props) {
         // brief "done" flash, then clear
         setTimeout(() => setProgress(null), 600);
       } catch (e: any) {
-        setError(e?.message ?? "No se pudo procesar el archivo");
+        setError(e?.message ?? "No se pudo abrir el archivo.");
         setProgress({ stage: "error", percent: 0 });
       }
     },
@@ -76,7 +76,7 @@ export function UploadZone({ onScoreLoaded }: Props) {
     if (!progress) return null;
     switch (progress.stage) {
       case "uploading":
-        return "Subiendo…";
+        return "Leyendo…";
       case "processing":
         return "Procesando…";
       case "done":
@@ -90,7 +90,7 @@ export function UploadZone({ onScoreLoaded }: Props) {
 
   return (
     <>
-      <div className="flex items-center gap-2">
+      <div className="relative flex items-center gap-2">
         <button
           type="button"
           disabled={busy}
@@ -104,6 +104,22 @@ export function UploadZone({ onScoreLoaded }: Props) {
           )}
           Abrir partitura
         </button>
+        {!busy && error && (
+          <div
+            role="alert"
+            className="absolute right-0 top-full z-50 mt-2 flex w-80 max-w-[90vw] items-start gap-2 rounded-md border border-border bg-card p-3 text-xs leading-snug text-foreground shadow-lg"
+          >
+            <span className="flex-1">{error}</span>
+            <button
+              type="button"
+              aria-label="Cerrar aviso"
+              className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground"
+              onClick={() => setError(null)}
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
         {busy && (
           <div className="flex w-32 flex-col gap-1">
             <span className="truncate text-[11px] italic text-foreground">
@@ -113,15 +129,10 @@ export function UploadZone({ onScoreLoaded }: Props) {
             <Progress value={progress?.percent ?? 0} className="h-1" />
           </div>
         )}
-        {!busy && error && (
-          <span className="max-w-48 truncate text-[11px] italic text-destructive" title={error}>
-            {error}
-          </span>
-        )}
         <input
           ref={inputRef}
           type="file"
-          accept=".pdf,.musicxml,.xml,.mxl,.mid,.midi"
+          accept=".musicxml,.xml,.mxl"
           className="hidden"
           onChange={(e) => {
             const f = e.target.files?.[0];
@@ -133,7 +144,7 @@ export function UploadZone({ onScoreLoaded }: Props) {
       {dragOver && (
         <div className="pointer-events-none fixed inset-0 z-[100] flex items-center justify-center border-4 border-dashed border-primary bg-primary/10">
           <div className="rounded-lg bg-card px-6 py-4 text-sm font-medium shadow-lg">
-            Soltá la partitura acá (PDF, XML, MIDI)
+            Soltá la partitura acá (.musicxml, .xml o .mxl)
           </div>
         </div>
       )}

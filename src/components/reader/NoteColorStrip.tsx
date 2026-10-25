@@ -1,4 +1,5 @@
-import { NOTE_LABELS, NOTE_SHORT, OFF_CHIP_COLOR } from "@/lib/colors/defaults";
+import { NOTE_SHORT, OFF_CHIP_COLOR } from "@/lib/colors/defaults";
+import { noteChipLabel } from "@/lib/colors/labels";
 import { setNotesEnabled, setRoleEnabled, useColors } from "@/lib/colors/store";
 
 /** 12 round chips (C … B). Filled = colored, outlined grey = plain black. Click toggles. */
@@ -10,7 +11,7 @@ export function NoteColorStrip() {
 
   return (
     <div className="flex items-center gap-2">
-      <span className="text-xs text-muted-foreground">Note colors</span>
+      <span className="text-xs text-muted-foreground">Colores de las notas</span>
       <div className="flex items-center gap-1">
         {roles.map((r, i) => {
           if (!r) return null;
@@ -21,8 +22,8 @@ export function NoteColorStrip() {
               type="button"
               onClick={() => setRoleEnabled(r.id, !on)}
               aria-pressed={on}
-              aria-label={`${NOTE_LABELS[i]} ${on ? "colored" : "plain"}`}
-              title={`${NOTE_LABELS[i]}: ${on ? "colored" : "plain black"}`}
+              aria-label={`${noteChipLabel(i)}: ${on ? "con color" : "en negro"}`}
+              title={`${noteChipLabel(i)}: ${on ? "con color" : "en negro"}`}
               className="flex h-5 w-5 items-center justify-center rounded-full border text-[8px] font-semibold leading-none"
               style={
                 on
@@ -41,14 +42,14 @@ export function NoteColorStrip() {
           onClick={() => setNotesEnabled(true)}
           className={`rounded px-2 py-0.5 text-xs ${allOn ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
         >
-          All
+          Todas
         </button>
         <button
           type="button"
           onClick={() => setNotesEnabled(false)}
           className={`rounded px-2 py-0.5 text-xs ${allOff ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
         >
-          None
+          Ninguna
         </button>
       </div>
     </div>

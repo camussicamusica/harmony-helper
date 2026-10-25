@@ -4,17 +4,17 @@ import { ReaderPage } from "@/components/reader/ReaderPage";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Sheet Reader — Interactive Piano Score" },
+      { title: "Harmony Helper" },
       {
         name: "description",
         content:
-          "Active-reading sheet music tool: scrolling score paired with a color-coded virtual piano for building visual-motor connection.",
+          "Estudiá una partitura con colores, intervalos, acordes y un piano en pantalla.",
       },
-      { property: "og:title", content: "Sheet Reader — Interactive Piano Score" },
+      { property: "og:title", content: "Harmony Helper" },
       {
         property: "og:description",
         content:
-          "Active-reading sheet music tool: scrolling score paired with a color-coded virtual piano.",
+          "Estudiá una partitura con colores, intervalos, acordes y un piano en pantalla.",
       },
     ],
   }),

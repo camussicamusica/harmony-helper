@@ -16,7 +16,7 @@ const GROUP_IDS: ColorGroup[] = ["notes", "chords", "intervals", "patterns", "fu
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 const now = () => new Date().toISOString();
 
-function defaultPalette(name = "My colors"): Palette {
+function defaultPalette(name = "Mis colores"): Palette {
   const t = now();
   return { id: uid(), name, createdAt: t, updatedAt: t, roles: buildDefaultRoles(), swatches: [] };
 }
@@ -295,14 +295,14 @@ function cloneAs(p: Palette, name: string): Palette {
 
 /** Snapshot the current palette (colors, targets and on/off state) as a new version, and switch to it. */
 export function saveVersion(name: string): string {
-  const copy = cloneAs(currentPalette(), name.trim() || `${currentPalette().name} copy`);
+  const copy = cloneAs(currentPalette(), name.trim() || `${currentPalette().name} copia`);
   commit({ versions: [...state.versions, copy], currentId: copy.id });
   return copy.id;
 }
 
 export function duplicateVersion(id?: string): string {
   const src = state.versions.find((v) => v.id === (id ?? state.currentId)) ?? currentPalette();
-  const copy = cloneAs(src, `${src.name} copy`);
+  const copy = cloneAs(src, `${src.name} copia`);
   commit({ versions: [...state.versions, copy], currentId: copy.id });
   return copy.id;
 }
@@ -333,13 +333,13 @@ export function importJson(text: string): string | null {
   try {
     data = JSON.parse(text);
   } catch {
-    return "That file is not valid JSON.";
+    return "Ese archivo no es un JSON válido.";
   }
   const pal = data?.palette ?? data;
-  if (!isPalette(pal)) return "That file is not a color palette.";
+  if (!isPalette(pal)) return "Ese archivo no es una paleta de colores.";
   const clean = sanitize(pal);
   const t = now();
-  const imported: Palette = { ...clean, id: uid(), name: `${clean.name} (imported)`, createdAt: t, updatedAt: t };
+  const imported: Palette = { ...clean, id: uid(), name: `${clean.name} (importada)`, createdAt: t, updatedAt: t };
   commit({ versions: [...state.versions, imported], currentId: imported.id });
   return null;
 }

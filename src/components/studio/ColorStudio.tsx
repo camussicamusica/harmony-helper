@@ -32,6 +32,7 @@ import {
   toggleRoleTarget,
   useColors,
 } from "@/lib/colors/store";
+import { roleLabel } from "@/lib/colors/labels";
 import { NAMED_SWATCHES } from "@/lib/colors/defaults";
 import { normalizeHex, similarPairs } from "@/lib/colors/color";
 import { PRESETS } from "@/lib/colors/presets";
@@ -54,11 +55,11 @@ export function ColorStudio() {
 
   const doImport = async (file: File) => {
     const err = importJson(await file.text());
-    setMessage(err ?? "Imported as a new version.");
+    setMessage(err ?? "Importada como versión nueva.");
   };
 
   const saveAsNew = () => {
-    const name = window.prompt("Name for the new version", `${palette.name} 2`);
+    const name = window.prompt("Nombre de la versión nueva", `${palette.name} 2`);
     if (name) saveVersion(name);
   };
 
@@ -66,7 +67,7 @@ export function ColorStudio() {
     <Sheet modal={false}>
       <SheetTrigger asChild>
         <Button size="sm" variant="outline" className="gap-1">
-          <PaletteIcon className="h-4 w-4" /> Colors
+          <PaletteIcon className="h-4 w-4" /> Colores
         </Button>
       </SheetTrigger>
       <SheetContent
@@ -76,7 +77,7 @@ export function ColorStudio() {
         onInteractOutside={(e) => e.preventDefault()}
       >
         <SheetHeader>
-          <SheetTitle>Color studio</SheetTitle>
+          <SheetTitle>Estudio de colores</SheetTitle>
         </SheetHeader>
 
         <div className="flex items-center gap-2">
@@ -85,14 +86,14 @@ export function ColorStudio() {
             defaultValue={palette.name}
             onBlur={(e) => renameVersion(e.target.value)}
             className="h-8 flex-1 text-sm"
-            aria-label="Version name"
+            aria-label="Nombre de la versión"
           />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button size="sm" variant="outline">Versions</Button>
+              <Button size="sm" variant="outline">Versiones</Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Switch to</DropdownMenuLabel>
+              <DropdownMenuLabel>Cambiar a</DropdownMenuLabel>
               {versions.map((v) => (
                 <DropdownMenuItem key={v.id} onSelect={() => switchVersion(v.id)}>
                   {v.id === palette.id ? "● " : ""}
@@ -100,18 +101,18 @@ export function ColorStudio() {
                 </DropdownMenuItem>
               ))}
               <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={() => duplicateVersion()}>Duplicate this one</DropdownMenuItem>
-              <DropdownMenuItem onSelect={saveAsNew}>Save as new version…</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => duplicateVersion()}>Duplicar esta</DropdownMenuItem>
+              <DropdownMenuItem onSelect={saveAsNew}>Guardar como versión nueva…</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" variant="ghost" className="gap-1" onClick={doExport}>
-            <Download className="h-3.5 w-3.5" /> Export
+            <Download className="h-3.5 w-3.5" /> Exportar
           </Button>
           <Button size="sm" variant="ghost" className="gap-1" onClick={() => fileRef.current?.click()}>
-            <Upload className="h-3.5 w-3.5" /> Import
+            <Upload className="h-3.5 w-3.5" /> Importar
           </Button>
           <input
             ref={fileRef}
@@ -126,7 +127,7 @@ export function ColorStudio() {
           />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button size="sm" variant="ghost">Presets</Button>
+              <Button size="sm" variant="ghost">Paletas</Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
               {PRESETS.map((p) => (
@@ -169,7 +170,7 @@ function GroupPanel({ group, roles, swatches }: { group: ColorGroup; roles: Colo
         <div className="rounded-md border border-border bg-muted/50 p-2 text-xs text-muted-foreground">
           {clashes.slice(0, 3).map((c) => (
             <div key={c.a.id + c.b.id}>
-              {c.a.name} and {c.b.name} look almost the same
+              {roleLabel(c.a)} y {roleLabel(c.b)} se ven casi iguales
             </div>
           ))}
         </div>
@@ -181,12 +182,12 @@ function GroupPanel({ group, roles, swatches }: { group: ColorGroup; roles: Colo
         size="sm"
         variant="outline"
         className="mt-1 gap-1 self-start"
-        onClick={() => addRole(group, "New color")}
+        onClick={() => addRole(group, "Color nuevo")}
       >
-        <Plus className="h-3.5 w-3.5" /> New color
+        <Plus className="h-3.5 w-3.5" /> Color nuevo
       </Button>
       {hiddenCount > 0 && (
-        <div className="text-xs text-muted-foreground">{hiddenCount} hidden (kept, not deleted)</div>
+        <div className="text-xs text-muted-foreground">{hiddenCount} oculto{hiddenCount === 1 ? "" : "s"} (se guardan, no se borran)</div>
       )}
     </div>
   );
@@ -205,7 +206,7 @@ function RoleRow({ role, swatches }: { role: ColorRole; swatches: string[] }) {
           <PopoverTrigger asChild>
             <button
               type="button"
-              aria-label={`Pick color for ${role.name}`}
+              aria-label={`Elegir color para ${roleLabel(role)}`}
               className="h-7 w-7 shrink-0 rounded-md border border-border"
               style={{ backgroundColor: role.color }}
             />
@@ -229,13 +230,13 @@ function RoleRow({ role, swatches }: { role: ColorRole; swatches: string[] }) {
             </div>
             {swatches.length > 0 && (
               <>
-                <div className="mt-3 text-xs text-muted-foreground">My swatches</div>
+                <div className="mt-3 text-xs text-muted-foreground">Mis colores guardados</div>
                 <div className="mt-1 grid grid-cols-7 gap-1.5">
                   {swatches.map((s) => (
                     <button
                       key={s}
                       type="button"
-                      title={`${s} (right-click to remove)`}
+                      title={`${s} (clic derecho para quitar)`}
                       onClick={() => {
                         setRoleColor(role.id, s);
                         setHex(s);
@@ -257,19 +258,19 @@ function RoleRow({ role, swatches }: { role: ColorRole; swatches: string[] }) {
               className="mt-2 w-full gap-1"
               onClick={() => saveSwatch(role.color)}
             >
-              <Star className="h-3.5 w-3.5" /> Save this color
+              <Star className="h-3.5 w-3.5" /> Guardar este color
             </Button>
           </PopoverContent>
         </Popover>
 
         {role.builtIn ? (
-          <span className="flex-1 text-sm">{role.name}</span>
+          <span className="flex-1 text-sm">{roleLabel(role)}</span>
         ) : (
           <Input
             defaultValue={role.name}
             onBlur={(e) => renameRole(role.id, e.target.value)}
             className="h-7 flex-1 text-sm"
-            aria-label="Color name"
+            aria-label="Nombre del color"
           />
         )}
 
@@ -281,7 +282,7 @@ function RoleRow({ role, swatches }: { role: ColorRole; swatches: string[] }) {
             if (n) setRoleColor(role.id, n);
           }}
           className="h-7 w-24 font-mono text-xs"
-          aria-label="Hex color"
+          aria-label="Color en hex"
         />
         <input
           type="color"
@@ -291,13 +292,13 @@ function RoleRow({ role, swatches }: { role: ColorRole; swatches: string[] }) {
             setHex(e.target.value);
           }}
           className="h-7 w-7 shrink-0 cursor-pointer rounded border border-border bg-transparent p-0"
-          aria-label="Color wheel"
+          aria-label="Rueda de color"
         />
         {isNote && (
           <Switch
             checked={on}
             onCheckedChange={(v) => setRoleEnabled(role.id, v)}
-            aria-label={`${role.name} colored`}
+            aria-label={`${roleLabel(role)} con color`}
           />
         )}
         {!role.builtIn && (
@@ -305,7 +306,7 @@ function RoleRow({ role, swatches }: { role: ColorRole; swatches: string[] }) {
             size="icon"
             variant="ghost"
             className="h-7 w-7"
-            title="Hide (kept, not deleted)"
+            title="Ocultar (se guarda, no se borra)"
             onClick={() => hideRole(role.id)}
           >
             <EyeOff className="h-3.5 w-3.5" />

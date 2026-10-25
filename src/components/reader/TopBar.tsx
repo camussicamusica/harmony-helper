@@ -7,6 +7,7 @@ import { NoteColorStrip } from "./NoteColorStrip";
 import { IntervalStrip } from "./IntervalStrip";
 import { LINE_MODES, type LineColorMode } from "@/lib/music/lineMode";
 import { UploadZone } from "./UploadZone";
+import { MidiControl } from "./MidiControl";
 import { useLayersOpen } from "@/lib/music/analysis/useFicha";
 import { ChevronDown, Keyboard, Layers, ListMusic, Minus, Pause, Play, Plus, Square } from "lucide-react";
 
@@ -63,19 +64,19 @@ export function TopBar({
 }: Props) {
   const [layersOpen, setLayersOpen] = useLayersOpen();
   const isoLabel: Record<IsolationMode, string> = {
-    both: "Both Hands",
-    rh: "Right Hand",
-    lh: "Left Hand",
+    both: "Dos manos",
+    rh: "Mano derecha",
+    lh: "Mano izquierda",
   };
 
   return (
     <header className="sticky top-0 z-30 flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-border bg-card px-4 py-2">
       <h1 className="text-base font-semibold tracking-tight">
-        Sheet Reader
-        {isPlaying && <span className="ml-2 text-xs italic text-muted-foreground">Playing</span>}
+        Harmony Helper
+        {isPlaying && <span className="ml-2 text-xs italic text-muted-foreground">Reproduciendo</span>}
         {!isPlaying && isolation !== "both" && (
           <span className="ml-2 text-xs italic text-muted-foreground">
-            {isoLabel[isolation]} Isolated
+            {isoLabel[isolation]} sola
           </span>
         )}
       </h1>
@@ -99,15 +100,15 @@ export function TopBar({
       <div className="flex items-center gap-1">
         {!isPlaying ? (
           <Button size="sm" onClick={onPlay} className="gap-1">
-            <Play className="h-4 w-4" /> Play
+            <Play className="h-4 w-4" /> Reproducir
           </Button>
         ) : (
           <Button size="sm" variant="secondary" onClick={onPause} className="gap-1">
-            <Pause className="h-4 w-4" /> Pause
+            <Pause className="h-4 w-4" /> Pausa
           </Button>
         )}
         <Button size="sm" variant="ghost" onClick={onStop} className="gap-1">
-          <Square className="h-4 w-4" /> Stop
+          <Square className="h-4 w-4" /> Detener
         </Button>
       </div>
 
@@ -171,7 +172,7 @@ export function TopBar({
             variant="ghost"
             className="h-7 w-7"
             onClick={() => onZoomChange(zoom - 0.1)}
-            aria-label="Zoom out"
+            aria-label="Alejar"
           >
             <Minus className="h-3.5 w-3.5" />
           </Button>
@@ -189,7 +190,7 @@ export function TopBar({
             variant="ghost"
             className="h-7 w-7"
             onClick={() => onZoomChange(zoom + 0.1)}
-            aria-label="Zoom in"
+            aria-label="Acercar"
           >
             <Plus className="h-3.5 w-3.5" />
           </Button>
@@ -216,6 +217,8 @@ export function TopBar({
         )}
 
         <NoteColorStrip />
+
+        <MidiControl />
 
         <Button
           size="sm"

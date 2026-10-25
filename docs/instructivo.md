@@ -8,14 +8,14 @@ tags: [harmony-helper]
 
 Cómo usar tu app de estudio de partituras. Una acción por paso. Los nombres entre comillas son los textos exactos de los botones.
 
-Nota: algunos botones están en inglés (por ejemplo "Play", "Pause", "Stop", "Tempo", "Zoom", "Both Hands", "Right Hand", "Left Hand", "Note colors", "Colors"). Otros están en español. Todo está escrito acá tal cual se ve.
+Nota: toda la app está en español (Argentina). Todo está escrito acá tal cual se ve. (Antes algunos botones estaban en inglés; ya se tradujeron.)
 
 ---
 
 ## Primera vez: recorrido rápido (5 pasos)
 
 1. Abrí la app (ver sección 1). Ya trae una pieza de ejemplo en Sol mayor.
-2. Tocá "Play". Escuchás la pieza y se iluminan las teclas del piano.
+2. Tocá "Reproducir". Escuchás la pieza y se iluminan las teclas del piano.
 3. Tocá "Estudiar" (arriba a la izquierda). Ves la partitura entera.
 4. Prendé "Línea melódica". Aparece una línea que une las notas.
 5. Tocá "Ficha". Se abre un panel con la tonalidad, la escala y los acordes.
@@ -49,18 +49,21 @@ Importante: no cierres la ventana de la Terminal mientras usás la app.
 
 ## 2. Abrir una partitura
 
-**MusicXML:** un tipo de archivo de partitura que entiende la app. Lo exportás desde MuseScore. Termina en `.musicxml` o `.xml`.
+**MusicXML:** un tipo de archivo de partitura que entiende la app. Lo exportás desde MuseScore. Termina en `.musicxml`, `.xml` o `.mxl` (la versión comprimida).
 
 1. Tocá "Abrir partitura" (arriba a la derecha).
-2. Elegí el archivo `.musicxml` o `.xml`.
+2. Elegí el archivo `.musicxml`, `.xml` o `.mxl`.
 3. Esperá a que se dibuje.
 
-También podés arrastrar el archivo y soltarlo en cualquier parte de la página. Aparece el cartel "Soltá la partitura acá (PDF, XML, MIDI)".
+También podés arrastrar el archivo y soltarlo en cualquier parte de la página. Aparece el cartel "Soltá la partitura acá (.musicxml, .xml o .mxl)".
 
-**Honestidad sobre lo que NO anda todavía:**
-- **PDF:** no funciona. El cartel menciona PDF, pero hoy la app no lee PDF.
-- **Peor:** si abrís un PDF o un MIDI, la app espera unos 3 segundos y te pone una escala de Do mayor de ejemplo, como si fuera tu pieza. No es tu pieza. No te avisa.
-- **`.mxl`** (MusicXML comprimido): no probado. Por cómo está hecha, es probable que falle. Si falla, exportá de nuevo como `.musicxml`.
+**Qué pasa con PDF y MIDI (ya no te engaña):**
+1. **PDF:** la app no lo abre. Aparece un aviso con una "X" para cerrarlo: "Todavía no puedo leer PDF. Por ahora, abrí la partitura en MuseScore (gratis) y exportala como MusicXML (.musicxml o .mxl). Leer PDF viene más adelante." No se carga nada y tu partitura actual queda como estaba.
+2. **MIDI (`.mid`, `.midi`):** igual, con otro aviso: todavía no se puede abrir un archivo MIDI como partitura.
+3. **Otro tipo de archivo, o un `.xml` que no es una partitura:** también avisa y no carga nada.
+4. Antes, un PDF o un MIDI esperaba 3 segundos y ponía una escala de Do mayor falsa. Eso ya no pasa. (El código de ese relleno falso sigue guardado en `omrService.ts`, pero nada lo llama.)
+
+**`.mxl` (MusicXML comprimido):** funciona. Un `.mxl` es un zip; la app lo abre por dentro y saca la partitura. Probado con un `.mxl` armado a mano (con `META-INF/container.xml`): cargó bien.
 
 Cuando abrís una partitura nueva, se detiene lo que estaba sonando y se reinicia la ficha.
 
@@ -87,13 +90,13 @@ La app recuerda el modo que elegiste la última vez.
 
 ## 4. Reproducir, tempo, manos
 
-1. "Play": empieza a sonar. Se convierte en "Pause".
-2. "Pause": pausa.
-3. "Stop": para y vuelve al principio.
-4. "Tempo": deslizá la barra. Va de 40 a 180 bpm (**bpm** = golpes por minuto; más alto = más rápido). Si cambiás el tempo mientras suena, se detiene. Tocá "Play" de nuevo.
-5. "Both Hands": suenan y se ven las dos manos.
-6. "Right Hand": solo la mano derecha.
-7. "Left Hand": solo la mano izquierda.
+1. "Reproducir": empieza a sonar. Se convierte en "Pausa".
+2. "Pausa": pausa.
+3. "Detener": para y vuelve al principio.
+4. "Tempo": deslizá la barra. Va de 40 a 180 bpm (**bpm** = golpes por minuto; más alto = más rápido). Si cambiás el tempo mientras suena, se detiene. Tocá "Reproducir" de nuevo.
+5. "Dos manos": suenan y se ven las dos manos.
+6. "Mano derecha": solo la mano derecha.
+7. "Mano izquierda": solo la mano izquierda.
 8. "Zoom": barra o botones "−" y "+". Agranda o achica la partitura (de 50% a 250%).
 
 Piano de abajo: las teclas se iluminan con el color de la nota que suena. Si apagaste el color de esa nota, se ilumina con el color de la mano.
@@ -104,52 +107,52 @@ Seek (saltar a un compás con el mouse): no existe todavía.
 
 ## 5. Colores
 
-### 5.1 La fila "Note colors" (apagar colores de a uno)
+### 5.1 La fila "Colores de las notas" (apagar colores de a uno)
 
 Sirve para ir sacando los colores de a poco, hasta leer la partitura en negro.
 
 1. Mirá la fila de 12 círculos de colores (Do, Do#, Re ... Si).
 2. Tocá un círculo. Queda vacío (borde gris) y esa nota pasa a negro en la partitura.
 3. Tocá el círculo de nuevo. Vuelve el color.
-4. "None": apaga las 12 de una vez.
-5. "All": prende las 12 de una vez.
+4. "Ninguna": apaga las 12 de una vez.
+5. "Todas": prende las 12 de una vez.
 
 Cada círculo muestra su letra (C, D, E...) cuando está apagado. Los sostenidos no muestran letra.
 
-### 5.2 El estudio de colores: botón "Colors"
+### 5.2 El estudio de colores: botón "Colores"
 
 **Rol:** un nombre que tiene un color. Por ejemplo, el rol "C" (la nota Do) tiene su color.
 
-1. Tocá "Colors" (arriba a la derecha). Se abre "Color studio" a la derecha. La partitura queda visible al lado: ves los cambios en vivo.
-2. Arriba hay pestañas: "Notes", "Chords", "Intervals", "Patterns", "Functions", "Interface".
-3. Cada fila es un rol. Cambiás su color de tres formas:
+1. Tocá "Colores" (arriba a la derecha). Se abre "Estudio de colores" a la derecha. La partitura queda visible al lado: ves los cambios en vivo.
+2. Arriba hay pestañas: "Notas", "Acordes", "Intervalos", "Patrones", "Funciones", "Interfaz".
+3. Cada fila es un rol (con nombre en español: "Do (C)", "Mayor", "2ª menor", "Tónica"…). Cambiás su color de tres formas:
    - Tocá el cuadradito de color: se abre una paleta de colores con nombre.
    - Escribí el código en la casilla (se llama **hex**, por ejemplo `#E53935`).
    - Usá la rueda de color (el cuadradito al lado del hex).
-4. En la paleta, "Save this color" guarda ese color en "My swatches" (tus colores favoritos). Para sacar uno: clic derecho sobre él.
-5. Los botones debajo de cada fila ("Stem", "Notehead", "Accidental", "Piano key", "Square", "Circle", "Band") son los **targets**: dónde se pinta ese color. Azul oscuro = prendido.
-   - Stem = palito de la nota. Notehead = la cabeza de la nota. Accidental = el # o ♭. Piano key = la tecla. Square = cuadrado. Circle = círculo. Band = franja.
-   - No todos los targets están conectados todavía a algo en pantalla. Los que se ven hoy: Stem, Accidental, Piano key y Square (probado en la pestaña "Notes").
-6. En las notas, el interruptor de la derecha apaga ese color (igual que los círculos de "Note colors").
-7. "New color" (abajo de cada pestaña): crea un rol nuevo.
+4. En la paleta, "Guardar este color" guarda ese color en "Mis colores guardados" (tus colores favoritos). Para sacar uno: clic derecho sobre él.
+5. Los botones debajo de cada fila ("Plica", "Cabeza de nota", "Alteración", "Tecla del piano", "Cuadrado", "Círculo", "Franja") son los **targets**: dónde se pinta ese color. Azul oscuro = prendido.
+   - Plica = palito de la nota. Cabeza de nota = el círculo de la nota. Alteración = el # o ♭. Tecla del piano = la tecla. Cuadrado, Círculo y Franja = formas.
+   - No todos los targets están conectados todavía a algo en pantalla. Los que se ven hoy: Plica, Alteración, Tecla del piano y Cuadrado (probado en la pestaña "Notas").
+6. En las notas, el interruptor de la derecha apaga ese color (igual que los círculos de "Colores de las notas").
+7. "Color nuevo" (abajo de cada pestaña): crea un rol nuevo.
 8. El ojo tachado en un rol nuevo lo oculta. No se borra nunca.
-9. Si dos colores se parecen mucho, arriba aparece un aviso: "X and Y look almost the same". Es solo un aviso.
+9. Si dos colores se parecen mucho, arriba aparece un aviso: "X y Y se ven casi iguales". Es solo un aviso.
 
 ### 5.3 Versiones
 
-**Versión:** una foto de todos tus colores. Se llama "My colors" al principio.
+**Versión:** una foto de todos tus colores. Se llama "Mis colores" al principio. (Si ya tenías una versión guardada con el nombre en inglés, "My colors", conserva ese nombre: no se renombra sola.)
 
 1. Para renombrar la versión actual: escribí en la casilla de arriba y salí de la casilla (clic afuera).
-2. "Versions": menú para cambiar de versión ("Switch to"), "Duplicate this one" o "Save as new version…".
+2. "Versiones": menú para cambiar de versión ("Cambiar a"), "Duplicar esta" o "Guardar como versión nueva…".
 3. Las versiones no se borran.
 
-### 5.4 Presets, Export, Import
+### 5.4 Paletas, Exportar, Importar
 
-1. "Presets": hoy hay uno, "Callipari chords". Cambia solo los colores de los acordes.
-2. "Export": baja un archivo `.json` con tus colores. Es tu copia de seguridad.
-3. "Import": subís un `.json`. Entra como una versión nueva, con "(imported)" en el nombre.
+1. "Paletas": hoy hay una, "Acordes Callipari". Cambia solo los colores de los acordes.
+2. "Exportar": baja un archivo `.json` con tus colores. Es tu copia de seguridad.
+3. "Importar": subís un `.json`. Entra como una versión nueva, con "(importada)" en el nombre.
 
-No probado: export, import, presets y guardar versiones. Los vi en el código, pero no los usé para no tocar tu configuración.
+No probado: exportar, importar, paletas y guardar versiones. Los vi en el código, pero no los usé para no tocar tu configuración.
 
 ### 5.5 Color de la línea
 
@@ -184,7 +187,7 @@ Dentro de "Capas":
    - "Estudiar de a uno": deja un solo salto prendido. Cada vez que lo tocás, pasa al siguiente.
 5. En "Intervalos" y "Ambos", abajo a la derecha de la partitura aparece una leyenda con los saltos que hay en la pieza y sus colores.
 
-Los colores de los saltos se cambian en "Colors", pestaña "Intervals".
+Los colores de los saltos se cambian en "Colores", pestaña "Intervalos".
 
 ---
 
@@ -240,7 +243,7 @@ Muestra un acorde a la vez sobre las 12 notas, en círculo.
 5. Si el acorde no es de la escala, la figura tiene borde punteado y aparece un aviso.
 6. Debajo del círculo ves el nombre del acorde y su función: "TÓNICA", "Subdominante" o "Dominante".
 7. **El arco:** debajo hay un arco con "Subdominante" a la izquierda, "CASA" (la tónica) abajo en el medio, y "Dominante" a la derecha. Una bolita marca dónde está el acorde actual.
-8. Los colores del arco vienen de "Colors", pestaña "Functions". Si no los pintaste, el arco se ve gris.
+8. Los colores del arco vienen de "Colores", pestaña "Funciones". Si no los pintaste, el arco se ve gris.
 9. **Las flechas** (solo en acordes Dominante): muestran hacia dónde se mueve cada nota para llegar a "casa". La flecha más gruesa es la que más empuja.
 10. "Escuchar": suena el acorde.
 11. "Escuchar la resolución" (solo en acordes Dominante): suena el acorde y después el acorde de la tónica.
@@ -259,7 +262,7 @@ Muestra un acorde a la vez sobre las 12 notas, en círculo.
    - "Tón" = tónica = la casa, estable.
    - "Subd" = subdominante = un paso afuera de casa.
    - "Dom" = dominante = tensión que pide volver a casa.
-6. El color del borde del círculo depende del tipo de acorde (mayor, menor, disminuido). Se cambia en "Colors", pestaña "Chords".
+6. El color del borde del círculo depende del tipo de acorde (mayor, menor, disminuido). Se cambia en "Colores", pestaña "Acordes".
 
 ### 8.5 Acordes de la pieza
 
@@ -280,21 +283,49 @@ La app adivina los acordes por las notas que suenan. Si se equivoca, la pieza pu
 
 ## 9. Teclado MIDI
 
-**Teclado MIDI:** tu piano o teclado electrónico, conectado a la compu con un cable.
+**Teclado MIDI:** tu piano o teclado electrónico, conectado a la compu con un cable USB.
 
-**Hoy no funciona.** Revisé el código: no hay nada que escuche tu teclado.
+**Lo que hace hoy:** la app te escucha tocar. Las teclas que apretás se iluminan en el piano de la pantalla y la app te dice qué nota tocaste y, si tocás 3 o más juntas, qué acorde es.
 
-Lo que sí existe:
-1. El piano de la pantalla se ilumina cuando suena la pieza.
-2. En la Ficha, podés tocar cuadrados y círculos para escuchar notas y acordes.
+**Lo que no hace todavía:** esperar a que toques la nota correcta antes de avanzar, repetir un tramo (loop), velocidades fijas de 50 / 75 / 100% (solo está la barra "Tempo"). Eso viene después.
 
-Lo que no existe todavía:
-1. Que la app te escuche tocar en tu teclado.
-2. Esperar a que toques la nota correcta antes de avanzar.
-3. Repetir un tramo (loop).
-4. Velocidades fijas de 50 / 75 / 100% (solo está la barra "Tempo").
+Usá **Chrome**. Otros navegadores no tienen MIDI.
 
-Si conectás el teclado y no pasa nada: es normal.
+### 9.1 Conectar el teclado (la primera vez)
+
+1. Enchufá el teclado a la Mac con el cable USB y prendelo.
+2. Abrí la app en Chrome (sección 1).
+3. Buscá el botón "Conectar teclado MIDI" (en la segunda fila de arriba, a la derecha de "Colores de las notas").
+4. Tocá "Conectar teclado MIDI". Dice "Conectando…" un segundo.
+5. Si Chrome te pregunta si permitís usar tus dispositivos MIDI, tocá "Permitir".
+6. El botón pasa a "Teclado: " con el nombre de tu teclado, y aparece un puntito verde.
+
+### 9.2 Ver lo que tocás
+
+1. Si estás en "Estudiar", tocá "Mostrar teclado" para ver el piano. En "Tocar" el piano ya se ve.
+2. Apretá una tecla de tu teclado.
+3. En el piano de la pantalla esa tecla se llena con el color de la nota (el de tu estudio de colores) y tiene un borde oscuro con un punto blanco. Es distinto de cuando suena la pieza: ahí solo se llena, sin borde.
+4. Si apagaste el color de esa nota, la tecla se pone gris.
+5. Al lado del botón aparece lo último que tocaste, por ejemplo "Re (D) · octava 4".
+6. Las teclas negras tienen dos nombres posibles (Do# o Re♭). La app muestra los dos: "Do# (C#) / Re♭ (D♭) · octava 4".
+7. Apretá 3 notas juntas (por ejemplo Fa#, La y Do#). Aparece el nombre del acorde: "Fa# menor". Si las notas no forman un acorde conocido, no dice nada (no adivina).
+8. Si usás el pedal de sustain, aparece la palabra "pedal" y las teclas quedan iluminadas mientras el pedal está apretado, aunque sueltes los dedos. Al soltar el pedal se apagan.
+
+### 9.3 Sonido de la app
+
+1. Tocá el botón con el nombre de tu teclado. Se abre un cuadrito con la lista de teclados conectados.
+2. El interruptor "Sonido de la app al tocar" está **apagado** de entrada. Tu teclado probablemente ya suena solo.
+3. Si lo prendés, la app suena además del teclado, con su piano de muestras. Si escuchás todo doble, apagalo.
+
+### 9.4 Avisos del botón
+
+1. "No encuentro ningún teclado. Enchufalo y apretá de nuevo.": la app no ve ningún teclado. Revisá el cable, prendé el teclado y tocá el aviso.
+2. "Chrome bloqueó el permiso. Hacé clic en el candado de la barra de direcciones → MIDI → Permitir.": hacé eso y recargá con Cmd + R.
+3. "Este navegador no tiene MIDI. Usá Chrome.": abrí la app en Chrome.
+4. "Reconectar teclado MIDI": ya lo conectaste antes en este navegador. Tocalo para volver a conectar. Si Chrome ya recuerda el permiso, se conecta solo al abrir la app.
+5. Si desenchufás el teclado, el botón vuelve a "No encuentro ningún teclado…". Al enchufarlo de nuevo se reconecta solo.
+
+**No probado con un teclado real.** Lo probé con un simulador (notas, acordes, pedal, sonido, avisos), no con tu teclado. Si algo no responde, contame qué teclado es y qué pasa.
 
 ---
 
@@ -305,14 +336,14 @@ Si conectás el teclado y no pasa nada: es normal.
    2. Recargá con Cmd + R.
 2. **Dice "No se puede acceder al sitio" o no abre:** el servidor está apagado. Repetí los pasos de la sección 1.
 3. **Cambié algo y no se actualiza:** recargá con Cmd + R.
-4. **Abrí un PDF y apareció otra pieza:** es el ejemplo falso (sección 2). Exportá la partitura como `.musicxml` desde MuseScore.
-5. **No suena:** apretá "Play" una vez más. El navegador pide un clic antes de dejar sonar. Subí el volumen de la Mac. (No probado: no pude escuchar audio.)
+4. **Abrí un PDF o un MIDI y no pasó nada, salvo un aviso:** es lo correcto (sección 2). Exportá la partitura como `.musicxml` o `.mxl` desde MuseScore.
+5. **No suena:** apretá "Reproducir" una vez más. El navegador pide un clic antes de dejar sonar. Subí el volumen de la Mac. (No probado: no pude escuchar audio.)
 6. **La tonalidad está mal:** corregila en "Ficha", sección "Tonalidad" (8.1).
 7. **No veo las etiquetas de los saltos:** pasá el mouse por la línea, o prendé "Etiquetas siempre" dentro de "Capas".
 8. **No veo la fila "Capas":** tocá "Capas". Empieza cerrada. Y "Línea melódica" tiene que estar prendida.
 9. **La barra de arriba tapa la partitura:** en ventanas angostas ocupa mucho lugar. Hacé la ventana del navegador más ancha, o cerrá "Capas".
 10. **La Ficha tapa la partitura:** el panel se abre sobre la derecha. Hacé la ventana más ancha, o cerrá la Ficha con la "X".
-11. **Perdí mis colores:** están guardados en este navegador. Si abrís la app en otro navegador o con otra dirección (otro número de puerto), no aparecen. Por eso conviene usar "Export" de vez en cuando.
+11. **Perdí mis colores:** están guardados en este navegador. Si abrís la app en otro navegador o con otra dirección (otro número de puerto), no aparecen. Por eso conviene usar "Exportar" de vez en cuando.
 12. **El piano no aparece:** en "Estudiar" está escondido. Tocá "Mostrar teclado".
 
 ---
@@ -322,8 +353,8 @@ Si conectás el teclado y no pasa nada: es normal.
 1. **Círculo de quintas:** no existe. El "Círculo" de la Ficha es otra cosa: muestra un acorde sobre las 12 notas.
 2. **Laboratorio de acordes:** es una idea guardada. No está hecho.
 3. **Análisis que se despliega al hacer clic:** idea guardada. No está hecho.
-4. **Leer PDF:** no existe (sección 2).
-5. **Teclado MIDI:** no existe (sección 9).
+4. **Leer PDF:** no existe (sección 2). La app te lo dice.
+5. **Esperar tu nota (modo "esperar"), repetir un tramo y velocidades 50/75/100%:** no existen (sección 9). El teclado MIDI ya se conecta y se ve.
 6. **Buscador de patrones** (motivos que se repiten): estaba en el plan inicial. No lo encontré en la pantalla. Solo existen los colores "Patterns" en el estudio, sin uso visible.
 7. **Biblioteca de partituras guardadas:** estaba en el plan inicial. No existe. Cada vez que abrís la app, vuelve a aparecer la pieza de ejemplo.
 8. **Saltar a un compás durante la reproducción:** no existe. En "Tocar", la partitura solo se mueve sola.

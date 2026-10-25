@@ -37,20 +37,20 @@ export interface Palette {
 }
 
 export const GROUPS: { id: ColorGroup; label: string }[] = [
-  { id: "notes", label: "Notes" },
-  { id: "chords", label: "Chords" },
-  { id: "intervals", label: "Intervals" },
-  { id: "patterns", label: "Patterns" },
-  { id: "functions", label: "Functions" },
-  { id: "interface", label: "Interface" },
+  { id: "notes", label: "Notas" },
+  { id: "chords", label: "Acordes" },
+  { id: "intervals", label: "Intervalos" },
+  { id: "patterns", label: "Patrones" },
+  { id: "functions", label: "Funciones" },
+  { id: "interface", label: "Interfaz" },
 ];
 
 export const ALL_TARGETS: { id: ColorTarget; label: string }[] = [
-  { id: "stem", label: "Stem" },
-  { id: "notehead", label: "Notehead" },
-  { id: "accidental", label: "Accidental" },
-  { id: "pianoKey", label: "Piano key" },
-  { id: "square", label: "Square" },
-  { id: "circleOutline", label: "Circle" },
-  { id: "band", label: "Band" },
+  { id: "stem", label: "Plica" },
+  { id: "notehead", label: "Cabeza de nota" },
+  { id: "accidental", label: "Alteración" },
+  { id: "pianoKey", label: "Tecla del piano" },
+  { id: "square", label: "Cuadrado" },
+  { id: "circleOutline", label: "Círculo" },
+  { id: "band", label: "Franja" },
 ];

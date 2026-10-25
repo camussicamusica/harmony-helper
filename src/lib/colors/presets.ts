@@ -8,7 +8,7 @@ export interface Preset {
 export const PRESETS: Preset[] = [
   {
     id: "callipari-chords",
-    name: "Callipari chords",
+    name: "Acordes Callipari",
     colors: {
       "chord-major": "#E8588F",
       "chord-minor": "#6CC4EE",
