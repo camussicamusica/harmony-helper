@@ -191,6 +191,15 @@ export function voiceChordMidi(pcs: number[], rootBase = 48): number[] {
   return out.map((m) => m + 12);
 }
 
+/**
+ * MIDI of one chord tone for a single-note click: the octave it has in `voicing` (what the chord button plays) when
+ * the pitch class is there, else octave 4 (C4 = 60). `pc` is 0..11.
+ */
+export function chipMidi(pc: number, voicing: readonly number[] = []): number {
+  const p = mod12(pc);
+  return voicing.find((m) => mod12(m) === p) ?? 60 + p;
+}
+
 /** MIDI for the scale going up from the tonic (8 notes, ending on the octave). */
 export function scaleMidi(key: KeyInfo): number[] {
   let base = 60 + key.tonicPc;

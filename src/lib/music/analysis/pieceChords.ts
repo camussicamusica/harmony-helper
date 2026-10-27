@@ -178,6 +178,19 @@ export function pieceChords(notes: ScheduledNote[], key: KeyInfo, meta: ScoreMet
         i++;
         continue;
       }
+      // A passing melody note can hide a chord that was already sounding: the voices that last into the next beat
+      // spell the same chord the next beat does. Then the chord starts here, not one beat later.
+      const next = row[i + 1];
+      const nextParts = next ? detectNotes(next.notes) : null;
+      if (next && nextParts) {
+        const held = row[i].notes.filter((n) => n.startSec + n.durationSec > next.startSec + EPS);
+        const heldParts = detectNotes(held);
+        if (heldParts && heldParts.root === nextParts.root && heldParts.quality === nextParts.quality) {
+          raw.push({ segs: [row[i], next], parts: nextParts, notes: [...new Set([...held, ...next.notes])] });
+          i += 2;
+          continue;
+        }
+      }
       let found = false;
       let union = [...row[i].notes];
       for (let j = i + 1; j < row.length; j++) {
@@ -244,9 +257,24 @@ export function pieceChords(notes: ScheduledNote[], key: KeyInfo, meta: ScoreMet
       noteIds: [],
     });
   }
-  // Highlight targets: notes starting inside each (merged) chord.
-  for (const c of out) {
-    c.noteIds = notes.filter((n) => n.startSec >= c.startSec - EPS && n.startSec < c.endSec - EPS).map((n) => n.id);
-  }
+  // Highlight targets: notes starting inside each (merged) chord, plus the chord tones that kept sounding from the
+  // chord right before it (a melody step changes the label, e.g. Si m7 -> Si menor, but the hand is still on the keys
+  // from the earlier beat; without them the box would sit on one lone melody note).
+  out.forEach((c, k) => {
+    const own = notes.filter((n) => n.startSec >= c.startSec - EPS && n.startSec < c.endSec - EPS);
+    const prev = out[k - 1];
+    const carried =
+      prev && Math.abs(prev.endSec - c.startSec) < EPS
+        ? notes.filter(
+            (n) =>
+              n.measure === c.measure &&
+              n.startSec >= prev.startSec - EPS &&
+              n.startSec < c.startSec - EPS &&
+              n.startSec + n.durationSec > c.startSec + EPS &&
+              c.pcs.includes(pcOf(n.spelledName)),
+          )
+        : [];
+    c.noteIds = [...carried, ...own].map((n) => n.id);
+  });
   return out;
 }

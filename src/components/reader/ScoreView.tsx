@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import * as OSMDModule from "opensheetmusicdisplay";
 import { applyStemColors, parseSheetToNotes } from "@/lib/music/parseMusicXml";
 import { activeNotes, getPlaybackSeconds } from "@/lib/music/scheduler";
-import { hoverText, INTERVAL_KEY_LABEL } from "@/lib/music/naming";
+import { hoverText, INTERVAL_KEY_LABEL, solfegeName } from "@/lib/music/naming";
 import { noteContext, type NoteContext } from "@/lib/music/analysis/noteContext";
 import { detectKeyFromNotes, type KeyInfo } from "@/lib/music/analysis/key";
 import { buildGeometry } from "@/lib/music/melodicLine";
@@ -23,6 +23,8 @@ import { pieceChords, type PieceChord } from "@/lib/music/analysis/pieceChords";
 import { getPalette, getRole } from "@/lib/colors/store";
 import { headHoverStyle, spelledPc } from "@/lib/colors/noteChip";
 import { buildNoteHitIndex, nearestNoteHit, type HeadBox, type NoteHitIndex } from "@/lib/music/noteHit";
+import { bandScrollTop } from "@/lib/music/scrollMath";
+import { clientToSvg, closeupBox } from "@/lib/music/closeup";
 import { ChordNoteChips } from "@/components/analysis/ChordNoteChips";
 import { intervalRole, intervalSignature, noteSignature, noteTargetOn, subscribe as subscribeColors } from "@/lib/colors/store";
 import type { Hand, IsolationMode, ScheduledNote, ScoreView as ViewMode } from "@/lib/music/types";
@@ -57,6 +59,8 @@ interface Props {
   highlightChords?: number[];
   /** Index into `chordMarks` of the occurrence she is walking through: a soft box in the chord's color. */
   occurrenceMark?: number | null;
+  /** Estudiar: px kept free on the right (the Ficha sheet) so the systems reflow into the visible width. */
+  rightInset?: number;
   /** Scroll the score to this chord (nonce makes repeated requests work). */
   focusChord?: { index: number; nonce: number } | null;
   /** Measure numbers she marked as hard (Recorrido): drawn as amber boxes. */
@@ -144,6 +148,7 @@ export function ScoreView({
   occurrenceMark = null,
   highlightChords = [],
   focusChord = null,
+  rightInset = 0,
   hardMeasures = [],
   markMode = false,
   onToggleHardMeasure,
@@ -184,6 +189,8 @@ export function ScoreView({
   viewRef.current = view;
   const onScoreDataRef = useRef(onScoreData);
   onScoreDataRef.current = onScoreData;
+  const rightInsetRef = useRef(rightInset);
+  rightInsetRef.current = view === "estudiar" ? rightInset : 0;
   const chordMarksRef = useRef(chordMarks);
   chordMarksRef.current = chordMarks;
   const occurrenceMarkRef = useRef(occurrenceMark);
@@ -228,6 +235,8 @@ export function ScoreView({
   const [panelOpen, setPanelOpen] = useState(false);
   const [pinned, setPinned] = useState(false);
   const [panelCtx, setPanelCtx] = useState<NoteContext | null>(null);
+  /** Cropped, enlarged copy of the printed score around the hovered note (the "photo" at the top of the panel). */
+  const [panelCloseup, setPanelCloseup] = useState<SVGSVGElement | null>(null);
   const [panelPos, setPanelPos] = useState<{ side: "left" | "right"; shiftY: number }>({ side: "right", shiftY: 0 });
   const tipRootRef = useRef<HTMLDivElement | null>(null);
   const tipTagRef = useRef<HTMLButtonElement | null>(null);
@@ -426,6 +435,7 @@ export function ScoreView({
     setPanelOpen(false);
     setPinned(false);
     setPanelCtx(null);
+    setPanelCloseup(null);
     const cur = hoverRef.current;
     if (!cur) return;
     hoverRef.current = null;
@@ -480,6 +490,76 @@ export function ScoreView({
   };
 
   /** Pointer entered the tag: unfold the panel (hover) with this note's analysis. */
+  /**
+   * A window of the page SVG around `note`, cloned and enlarged: what the note looks like on the page (color + shape +
+   * place on the staff). Only the hovered notehead is painted with her note color; everything else stays as printed.
+   */
+  const buildCloseup = (note: ScheduledNote): SVGSVGElement | null => {
+    try {
+      const wrap = wrapRef.current;
+      const head: Element | undefined = note.headEl?.isConnected ? note.headEl : note.svgEls?.[0];
+      const svg = head?.closest("svg") as SVGSVGElement | null | undefined;
+      if (!wrap || !head || !svg) return null;
+      const svgRect = svg.getBoundingClientRect();
+      const vbl = svg.viewBox?.baseVal;
+      const vb = vbl && vbl.width > 0 ? { x: vbl.x, y: vbl.y, w: vbl.width, h: vbl.height } : { x: 0, y: 0, w: svgRect.width, h: svgRect.height };
+      const hr = head.getBoundingClientRect();
+      const c = clientToSvg({ x: hr.left + hr.width / 2, y: hr.top + hr.height / 2 }, svgRect, vb);
+      const k = vb.w / (svgRect.width || 1); // client px -> svg units
+      const wr = wrap.getBoundingClientRect();
+      const rows = staffRowsRef.current.get(note.system ?? 0) ?? [];
+      const clientCy = hr.top + hr.height / 2;
+      const row = [...rows].sort(
+        (a, b) => Math.abs((a.top + a.bottom) / 2 + wr.top - clientCy) - Math.abs((b.top + b.bottom) / 2 + wr.top - clientCy),
+      )[0];
+      if (!row) return null;
+      const sp = ((row.bottom - row.top) / 4) * k;
+      const figureYs = notesRef.current
+        .filter((n) => n.cy !== undefined && n.hand === note.hand && (n.system ?? 0) === (note.system ?? 0) && Math.abs(n.startSec - note.startSec) < 1e-3)
+        .map((n) => clientToSvg({ x: 0, y: n.cy! + wr.top }, svgRect, vb).y);
+      const box = closeupBox({
+        cx: c.x,
+        cy: c.y,
+        sp,
+        staffTop: clientToSvg({ x: 0, y: row.top + wr.top }, svgRect, vb).y,
+        staffBottom: clientToSvg({ x: 0, y: row.bottom + wr.top }, svgRect, vb).y,
+        figureYs,
+      });
+      // Same child-index path from the root, to find the head inside the clone.
+      const path: number[] = [];
+      for (let el: Element | null = head; el && el !== svg; el = el.parentElement) {
+        path.unshift(Array.prototype.indexOf.call(el.parentElement?.children ?? [], el));
+      }
+      const clone = svg.cloneNode(true) as SVGSVGElement;
+      clone.querySelectorAll("[id]").forEach((e) => e.removeAttribute("id"));
+      clone.removeAttribute("id");
+      clone.querySelectorAll(".note-hover, .note-halo, .head-hover-fill, .head-hover-glow, .chord-hl").forEach((e) => {
+        e.classList.remove("note-hover", "note-halo", "head-hover-fill", "head-hover-glow", "chord-hl");
+      });
+      let target: Element | undefined = clone;
+      for (const i of path) target = target?.children[i];
+      if (target) {
+        const pc = spelledPc(note.spelledName) >= 0 ? spelledPc(note.spelledName) : note.midi % 12;
+        const color = headHoverStyle(pc, getPalette().roles)?.color ?? pitchClassColor(note.midi); // same color as the tag
+        const paint = (e: Element) => {
+          e.setAttribute("fill", color);
+          (e as SVGElement).style.fill = color;
+        };
+        if (target.tagName.toLowerCase() === "path") paint(target);
+        else target.querySelectorAll("path").forEach(paint);
+      }
+      clone.setAttribute("viewBox", `${box.viewBox.x} ${box.viewBox.y} ${box.viewBox.w} ${box.viewBox.h}`);
+      clone.setAttribute("width", String(box.width));
+      clone.setAttribute("height", String(box.height));
+      clone.setAttribute("preserveAspectRatio", "xMidYMid meet");
+      clone.removeAttribute("style");
+      clone.setAttribute("aria-hidden", "true");
+      return clone;
+    } catch {
+      return null;
+    }
+  };
+
   const openPanel = () => {
     const cur = hoverRef.current;
     if (!cur) return;
@@ -491,6 +571,7 @@ export function ScoreView({
     const { key, chords } = analysisForPanel();
     const live = notesRef.current.find((n) => n.id === cur.note.id) ?? cur.note;
     setPanelCtx(noteContext(live, notesRef.current, key, chords));
+    setPanelCloseup(buildCloseup(live));
     setPanelOpen(true);
   };
 
@@ -513,9 +594,11 @@ export function ScoreView({
     const r = (note.headEl?.isConnected ? note.headEl : note.svgEls?.[0])?.getBoundingClientRect();
     if (!r) return;
     // Tag on the right of the note, unless the tag + the unfolded panel would not fit there but fit on the left.
-    const fitsRight = r.right + 5 + TIP_NEED_W <= window.innerWidth;
+    // The Ficha sheet covers the right `rightInset` px: the panel must not open under it.
+    const rightEdge = window.innerWidth - rightInsetRef.current;
+    const fitsRight = r.right + 5 + TIP_NEED_W <= rightEdge;
     const fitsLeft = r.left - 5 - TIP_NEED_W >= 0;
-    const tagLeft = !fitsRight && (fitsLeft || r.right + 110 > window.innerWidth);
+    const tagLeft = !fitsRight && (fitsLeft || r.right + 110 > rightEdge);
     const x = Math.round(tagLeft ? r.left - 5 : r.right + 5);
     const y = Math.round(r.top + r.height / 2);
     if (!force && x === cur.x && y === cur.y) return;
@@ -558,7 +641,7 @@ export function ScoreView({
   };
 
   /** Where a chord mark sits: x over its first notes, y above the top staff of that system. */
-  const chordPosition = (chord: PieceChord): { x: number; y: number } | null => {
+  const chordPosition = (chord: PieceChord): { x: number; y: number; sys: number } | null => {
     const byId = new Map(notesRef.current.map((n) => [n.id, n]));
     const ns = chord.noteIds.map((id) => byId.get(id)).filter((n): n is ScheduledNote => !!n && n.cx !== undefined);
     if (!ns.length) return null;
@@ -569,7 +652,34 @@ export function ScoreView({
     const top = systemTopRef.current.get(sys);
     const ys = ns.filter((n) => (n.system ?? 0) === sys).map((n) => n.cy!);
     const y = (top !== undefined ? Math.min(top, Math.min(...ys) - 8) : Math.min(...ys) - 30) - 24;
-    return { x, y };
+    return { x, y, sys };
+  };
+
+  /** Vertical extent (px, wrapper-relative) of one system with room for what hangs off it: stems, ledger lines, voltas, numbers. */
+  const systemBand = (sys: number): { y0: number; y1: number; ty0: number; ty1: number } | null => {
+    const rows = staffRowsRef.current.get(sys) ?? [];
+    const ys = notesRef.current.filter((n) => (n.system ?? 0) === sys && n.cy !== undefined).map((n) => n.cy!);
+    if (!rows.length && !ys.length) return null;
+    const sp = rows.length ? Math.max(4, (rows[0].bottom - rows[0].top) / 4) : 8;
+    const top = Math.min(...rows.map((r) => r.top), ...ys);
+    const bottom = Math.max(...rows.map((r) => r.bottom), ...ys);
+    // y0/y1: roomy margins; ty0/ty1: tight ones, used when the roomy band is taller than the visible area.
+    return { y0: top - 6 * sp, y1: bottom + 6 * sp, ty0: top - 3 * sp, ty1: bottom + 3 * sp };
+  };
+
+  /**
+   * Estudiar: scroll the page so the band [y0, y1] (wrapper-relative px) is whole inside the visible part of the score,
+   * between the sticky top bar and the sticky piano: vertically centered, or its top edge if it is taller than that.
+   */
+  const scrollBandIntoView = (y0: number, y1: number, tight?: { y0: number; y1: number }) => {
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    const topEl = document.querySelector("[data-chrome='top']");
+    const botEl = document.querySelector("[data-chrome='bottom']");
+    const visTop = topEl ? topEl.getBoundingClientRect().bottom : 0;
+    const visBottom = Math.min(window.innerHeight, botEl ? botEl.getBoundingClientRect().top : window.innerHeight);
+    const docTop = wrap.getBoundingClientRect().top + window.scrollY;
+    window.scrollTo({ top: bandScrollTop({ docTop, y0, y1, tight, visTop, visBottom }), behavior: "smooth" });
   };
 
   /**
@@ -603,7 +713,7 @@ export function ScoreView({
     const inSys = ns.filter((n) => (n.system ?? 0) === sys);
     const x0 = Math.min(...inSys.map((n) => n.cx!)) - 22;
     const x1 = Math.max(Math.max(...inSys.map((n) => n.cx!)) + 22, x0 + 60);
-    const mb = measureBoxes().get(chord.measure);
+    const mb = measureBoxes(sys).get(chord.measure);
     const ys = inSys.map((n) => n.cy!);
     const top = systemTopRef.current.get(sys);
     const y0 = mb?.y0 ?? (top !== undefined ? Math.min(top, Math.min(...ys) - 8) : Math.min(...ys) - 30) - 8;
@@ -629,13 +739,14 @@ export function ScoreView({
 
 
   /** Box (px, relative to the wrapper) of every measure that has notes: x from the neighbours' midpoints, y over the system. */
-  const measureBoxes = (): Map<number, { x0: number; x1: number; y0: number; y1: number }> => {
+  const measureBoxes = (onlySystem?: number): Map<number, { x0: number; x1: number; y0: number; y1: number }> => {
     const out = new Map<number, { x0: number; x1: number; y0: number; y1: number }>();
     const bySys = new Map<number, Map<number, { min: number; max: number }>>();
     const ySys = new Map<number, { min: number; max: number }>();
     for (const n of notesRef.current) {
       if (n.cx === undefined || n.cy === undefined) continue;
       const sys = n.system ?? 0;
+      if (onlySystem !== undefined && sys !== onlySystem) continue;
       const ms = bySys.get(sys) ?? new Map<number, { min: number; max: number }>();
       const e = ms.get(n.measure);
       if (e) {
@@ -898,7 +1009,7 @@ export function ScoreView({
   };
 
   /** Scroll so a box (px, relative to the wrapper) is in view: Tocar moves the band, Estudiar moves the page. */
-  const scrollToBox = (b: { x0: number; y0: number }) => {
+  const scrollToBox = (b: { x0: number; y0: number; y1?: number }) => {
     const sc = scrollRef.current;
     const wrap = wrapRef.current;
     if (!sc || !wrap) return;
@@ -906,8 +1017,7 @@ export function ScoreView({
       holdUntilRef.current = performance.now() + 2500;
       sc.scrollTo({ left: Math.max(0, b.x0 - NOW_LINE_FRACTION * sc.clientWidth), behavior: "smooth" });
     } else {
-      const top = wrap.getBoundingClientRect().top + window.scrollY + b.y0 - 150;
-      window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+      scrollBandIntoView(b.y0 - 40, (b.y1 ?? b.y0 + 200) + 40);
     }
   };
 
@@ -1559,8 +1669,9 @@ export function ScoreView({
       holdUntilRef.current = performance.now() + 2500;
       sc.scrollTo({ left: Math.max(0, pos.x - NOW_LINE_FRACTION * sc.clientWidth), behavior: "smooth" });
     } else {
-      const top = wrap.getBoundingClientRect().top + window.scrollY + pos.y - 150;
-      window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+      const band = systemBand(pos.sys);
+      if (band) scrollBandIntoView(band.y0, band.y1, { y0: band.ty0, y1: band.ty1 });
+      else scrollBandIntoView(pos.y - 40, pos.y + 300);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusChord]);
@@ -1623,7 +1734,11 @@ export function ScoreView({
   const tocar = view === "tocar";
 
   return (
-    <div className={tocar ? "relative h-full w-full bg-background" : "relative w-full bg-background"}>
+    <div
+      className={tocar ? "relative h-full w-full bg-background" : "relative w-full bg-background"}
+      // Estudiar with the Ficha open: the score container gets narrower, its resize observer re-wraps the systems.
+      style={!tocar && rightInset > 0 ? { paddingRight: rightInset } : undefined}
+    >
       <div
         ref={scrollRef}
         onPointerDown={onPointerDown}
@@ -1722,7 +1837,7 @@ export function ScoreView({
                 className="tip-panel-card max-h-[calc(100vh-16px)] overflow-y-auto rounded-md border border-border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md"
                 data-side={panelPos.side}
               >
-                <NotePanel tooltip={tooltip} ctx={panelCtx} />
+                <NotePanel tooltip={tooltip} ctx={panelCtx} closeup={panelCloseup} />
               </div>
             </div>
           )}
@@ -1763,11 +1878,38 @@ function PanelSection({ title, children, testId }: { title: string; children: Re
   );
 }
 
+/** The cropped score "photo": mounts the prepared SVG clone. */
+function Closeup({ svg }: { svg: SVGSVGElement }) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  useLayoutEffect(() => {
+    const host = ref.current;
+    if (!host) return;
+    host.replaceChildren(svg);
+    return () => {
+      if (svg.parentNode === host) host.removeChild(svg);
+    };
+  }, [svg]);
+  return (
+    <div
+      ref={ref}
+      className="score-root mx-auto overflow-hidden rounded border border-border bg-white"
+      style={{ width: svg.getAttribute("width") + "px", height: svg.getAttribute("height") + "px", maxWidth: "100%" }}
+      data-testid="tip-closeup"
+    />
+  );
+}
+
 /** Contents of the panel that unfolds from the note's tag. */
-function NotePanel({ tooltip, ctx }: { tooltip: TooltipState; ctx: NoteContext }) {
-  const { keyRole, chord, melody } = ctx;
+function NotePanel({ tooltip, ctx, closeup }: { tooltip: TooltipState; ctx: NoteContext; closeup: SVGSVGElement | null }) {
+  const { keyRole, chord, melody, figure, moment } = ctx;
   return (
     <div>
+      {closeup && (
+        <PanelSection title="En la partitura" testId="tip-closeup-section">
+          <Closeup svg={closeup} />
+        </PanelSection>
+      )}
+
       <PanelSection title="Nota" testId="tip-note">
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
           <ChordNoteChips spelled={[tooltip.own.spelled]} size="lg" />
@@ -1779,13 +1921,24 @@ function NotePanel({ tooltip, ctx }: { tooltip: TooltipState; ctx: NoteContext }
         </div>
       </PanelSection>
 
+      <PanelSection title="Su figura" testId="tip-figure">
+        {figure.alone ? (
+          <div className="text-[11px] text-muted-foreground">Nota sola (sin otras notas en su figura)</div>
+        ) : (
+          <div>
+            <ChordNoteChips spelled={figure.tones} ownIndex={figure.ownIndex} />
+            {(figure.chord || figure.interval) && <div className="mt-1 text-[11px] font-medium">{figure.chord ?? figure.interval}</div>}
+          </div>
+        )}
+      </PanelSection>
+
       {keyRole && (
         <PanelSection title="En la tonalidad" testId="tip-key">
           <div className="text-[11px] font-medium">{keyRole.text}</div>
         </PanelSection>
       )}
 
-      <PanelSection title="En el acorde" testId="tip-chord">
+      <PanelSection title="En el acorde (la armonía de ese momento)" testId="tip-chord">
         {chord ? (
           <div>
             <div className="text-[11px] font-medium">{chord.name}</div>
@@ -1802,22 +1955,27 @@ function NotePanel({ tooltip, ctx }: { tooltip: TooltipState; ctx: NoteContext }
         )}
       </PanelSection>
 
-      {/* Small measure: barlines left and right, measure number top-left. */}
-      <PanelSection title="Suenan juntas">
-        <div
-          className="relative rounded-md border-x-2 border-y border-y-border border-x-foreground/80 px-2.5 pb-1.5 pt-4"
-          data-testid="tip-measure"
-        >
-          <span className="absolute left-1.5 top-0.5 text-[10px] leading-3 text-muted-foreground">compás {tooltip.measure}</span>
-          <ChordNoteChips
-            spelled={tooltip.chord ? tooltip.chord.tones : [tooltip.own.spelled]}
-            ownIndex={tooltip.chord ? tooltip.chord.ownIndex : 0}
-          />
-          {tooltip.chord && (tooltip.chord.name || tooltip.chord.interval) && (
-            <div className="mt-1 text-[11px] font-medium">{tooltip.chord.name ?? tooltip.chord.interval}</div>
-          )}
-        </div>
-      </PanelSection>
+      {moment.differsFromFigure && (
+        <details className="mt-2" data-testid="tip-moment">
+          <summary className="mb-0.5 cursor-pointer text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            En este momento suenan (las dos manos)
+          </summary>
+          {/* Small measure: barlines left and right, measure number top-left. */}
+          <div
+            className="relative rounded-md border-x-2 border-y border-y-border border-x-foreground/80 px-2.5 pb-1.5 pt-4"
+            data-testid="tip-measure"
+          >
+            <span className="absolute left-1.5 top-0.5 text-[10px] leading-3 text-muted-foreground">compás {tooltip.measure}</span>
+            <ChordNoteChips spelled={moment.tones} ownIndex={moment.ownIndex} />
+            {moment.held.some(Boolean) && (
+              <div className="mt-1 text-[10px] text-muted-foreground">
+                sostenida{moment.held.filter(Boolean).length > 1 ? "s" : ""}: {moment.tones.filter((_, i) => moment.held[i]).map((t) => solfegeName(t)).join(", ")}
+              </div>
+            )}
+            {(moment.name || moment.interval) && <div className="mt-1 text-[11px] font-medium">{moment.name ?? moment.interval}</div>}
+          </div>
+        </details>
+      )}
 
       {(melody.prev || melody.next) && (
         <PanelSection title="Melodía" testId="tip-melody">

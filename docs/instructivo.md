@@ -339,15 +339,17 @@ Partitura de prueba: `public/prototipos/patrones-ejemplo.musicxml`. En la barra,
 
 El panel tiene estas secciones, cada una con su título en letras chicas:
 
+11b. **EN LA PARTITURA (arriba de todo):** una "foto" de la partitura alrededor de tu nota, agrandada: todo el pentagrama de la nota, las notas apiladas con ella y lo que cuelga arriba o abajo. Solo la cabeza de tu nota está pintada con su color; el resto queda como está impreso.
 12. **NOTA:** la nota en grande con su color, la octava (por ejemplo "Re4"), la duración (por ejemplo "negra con puntillo") y "compás N · tiempo M".
+12b. **SU FIGURA:** las otras notas de la misma figura: las del mismo pentagrama que empiezan en el mismo instante (el acorde o intervalo escrito junto a tu nota). Cajitas con la tuya marcada, y el nombre del acorde o el intervalo. Si está sola dice "Nota sola (sin otras notas en su figura)". No incluye el bajo que viene sosteniéndose ni la otra mano.
 13. **EN LA TONALIDAD:** el grado de la nota en la tonalidad de la pieza, con su nombre. Por ejemplo: "4.º grado de Re mayor · subdominante". Los nombres son: tónica, supertónica, mediante, subdominante, dominante, superdominante y sensible (en menor, el 7.º grado natural se llama subtónica).
 14. Si la nota no es de la escala, dice "fuera de la escala de Re mayor" y, si se puede, qué cambió: "alteración: Do# en vez de Do". En menor, el 7.º elevado se marca como "sensible (7.º grado elevado)".
 15. La tonalidad es la de la Ficha. Si la elegiste a mano en la Ficha, usa esa. Con la Ficha cerrada, la app la detecta sola.
-16. **EN EL ACORDE:** el acorde que suena en ese momento (el de "Acordes de la pieza" de la Ficha; si no hay, el que forman las notas que suenan juntas), con una cajita de color por cada nota del acorde y la tuya marcada con borde grueso.
+16. **EN EL ACORDE (la armonía de ese momento):** el acorde que suena en ese momento (el de "Acordes de la pieza" de la Ficha; si no hay, el que forman las notas que suenan juntas), con una cajita de color por cada nota del acorde y la tuya marcada con borde grueso. Es la armonía, no lo que está impreso junto a tu nota.
 17. Debajo dice qué es tu nota dentro del acorde: fundamental, tercera, quinta, séptima, novena, o "nota de paso / no es del acorde".
 18. Después, el grado y la función del acorde en la tonalidad, por ejemplo "IV · Subd" (Tón = tónica, Subd = subdominante, Dom = dominante). Si el acorde no es de la tonalidad, dice "acorde fuera de la tonalidad".
 19. Si no hay un acorde claro, dice "Sin un acorde claro en este momento". La app no adivina.
-20. **SUENAN JUNTAS:** un compás chiquito, con barras a los costados y el número de compás arriba a la izquierda. Adentro, una cajita por cada nota que suena junta (las dos manos), con la tuya marcada con borde grueso. Abajo, el nombre del acorde o, si son dos notas, el intervalo ("quinta justa").
+20. **EN ESTE MOMENTO SUENAN (las dos manos):** aparece plegado, solo si es distinto de "Su figura"; tocá el título para abrirlo. Es un compás chiquito, con barras a los costados y el número de compás arriba a la izquierda. Adentro, una cajita por cada nota que suena en ese instante: las que empiezan justo ahí en las dos manos y las que vienen de antes y siguen sonando (el bajo largo, por ejemplo), que se marcan como "sostenidas". Abajo, el nombre del acorde o, si son dos notas, el intervalo.
 21. **MELODÍA:** la nota anterior y la siguiente de la misma mano, con el salto y su dirección. Por ejemplo: "viene de La (A): sube una 4.ª justa" y "va a Si (B): sube una 2.ª mayor". Si no hay nota anterior o siguiente, esa línea no aparece.
 22. En "Tocar", la etiqueta y el panel siguen pegados a la nota mientras la partitura se mueve sola.
 
@@ -445,8 +447,13 @@ Muestra un acorde a la vez sobre las 12 notas, en círculo.
 9. Después de la última, vuelve a la 1ª.
 10. Para ir para atrás, tocá "◀". Para ir para adelante, tocá "▶".
 11. Si tocás el botón de otro acorde, empieza desde su 1ª aparición.
-12. En "Tocar" la partitura se mueve hacia el costado. En "Estudiar" se mueve hacia abajo o arriba. Funciona igual en las dos.
-13. La caja queda hasta que toques otro acorde o abras otra partitura.
+12. En "Tocar" la partitura se mueve hacia el costado. En "Estudiar" se mueve hacia abajo o arriba.
+13. En "Estudiar", con la Ficha abierta, la partitura se acomoda en el espacio que queda a la izquierda de la Ficha, así nada queda tapado.
+14. Al ir a una aparición, el sistema entero (los dos pentagramas, con las notas de arriba y de abajo) queda a la vista, centrado entre la barra de arriba y el piano.
+15. El número de compás es el impreso en la partitura. Si la pieza tiene repetición o casillas ("1." y "2."), cada lugar impreso cuenta una sola vez.
+16. Si un acorde se reconoce un tiempo después de empezar (por ejemplo, una nota de paso de la melodía lo tapa en el tiempo 2), la caja cubre desde que empieza a sonar. Si el acorde cambia de nombre solo por una nota de la melodía (Si m7 y después Si menor), la caja incluye las notas que siguen sonando.
+17. La caja queda hasta que toques otro acorde o abras otra partitura.
+18. Cada cajita de nota debajo del acorde se puede tocar: suena esa nota sola, en la misma octava en que suena el acorde. Pasá el mouse por encima: se levanta un poco. No cambia la aparición del acorde.
 
 **Tiempo:** el golpe del compás. En 4/4 hay 4 tiempos: 1, 2, 3, 4.
 

@@ -4,6 +4,7 @@ import { noteLabel, solfegeName, soundingAt } from "../naming";
 import { FUNCTION_SHORT, functionOf, isSeventh, romanFor, type ChordFunction, type ChordQuality } from "./chords";
 import type { KeyInfo } from "./key";
 import { detectChordParts, type PieceChord } from "./pieceChords";
+import { figureOf, momentOf, type Figure, type Moment } from "./noteFigure";
 
 const EPS = 1e-3;
 const mod12 = (n: number) => ((n % 12) + 12) % 12;
@@ -69,7 +70,11 @@ export interface MelodyStep {
 export interface NoteContext {
   pitch: { spelled: string; label: string; octave: number; octaveLabel: string };
   keyRole: KeyRole | null;
+  /** The figure printed with the note: same staff, same onset. */
+  figure: Figure;
   chord: ChordRole | null;
+  /** Everything sounding at that instant in both hands (held notes marked). */
+  moment: Moment;
   melody: { prev: MelodyStep | null; next: MelodyStep | null };
 }
 
@@ -267,7 +272,10 @@ export function noteContext(note: ScheduledNote, all: ScheduledNote[], key: KeyI
   const octave = octaveOf(note.midi, note.spelledName);
   const prev = neighbour(note, all, -1);
   const next = neighbour(note, all, 1);
+  const figure = figureOf(note, all);
   return {
+    figure,
+    moment: momentOf(note, all, figure),
     pitch: {
       spelled: note.spelledName,
       label: noteLabel(note.spelledName),

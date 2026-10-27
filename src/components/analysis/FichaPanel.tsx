@@ -12,6 +12,7 @@ import { PLAIN_COLOR } from "@/lib/colors/defaults";
 import { readableTextOn } from "@/lib/colors/color";
 import { noteColor, useColors } from "@/lib/colors/store";
 import { solfegeName } from "@/lib/music/naming";
+import { spelledPc } from "@/lib/colors/noteChip";
 import { keyFromId } from "@/lib/music/analysis/key";
 import {
   FUNCTION_ROLE,
@@ -20,6 +21,7 @@ import {
   scaleMidi,
   scaleSteps,
   voiceChordMidi,
+  chipMidi,
   type ScaleChord,
 } from "@/lib/music/analysis/chords";
 import { groupChords, occurrenceLabel } from "@/lib/music/analysis/occurrences";
@@ -432,7 +434,13 @@ export function FichaPanel({
                             )}
                           </div>
                           <div className="mt-1 pl-1">
-                            <ChordNoteChips spelled={c.notes} />
+                            <ChordNoteChips
+                              spelled={c.notes}
+                              onNoteClick={(n) => {
+                                const pc = spelledPc(n);
+                                if (pc >= 0) void playNoteMidi(chipMidi(pc, voiceChordMidi(c.pcs)));
+                              }}
+                            />
                           </div>
                         </li>
                       );

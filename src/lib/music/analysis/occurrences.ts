@@ -24,12 +24,22 @@ export function matcherFor(query: ChordQuery): (chord: PieceChord, index: number
   return (c) => ids.has(chordId(c));
 }
 
-/** Every occurrence of what `query` describes, in score order. */
+/** Printed spot of a chord: the same measure number and beat is the same place on the page. */
+const spotKey = (c: Pick<PieceChord, "measure" | "beat" | "rootPc" | "quality">) => `${c.measure}.${c.beat}.${chordId(c)}`;
+
+/**
+ * Every occurrence of what `query` describes, in score order. A printed spot counts once: if a repeat (or voltas)
+ * had been unrolled, the repeated pass of the same measure and beat is the same place on the page.
+ */
 export function findChordOccurrences(chords: readonly PieceChord[], query: ChordQuery): ChordOccurrence[] {
   const match = matcherFor(query);
   const out: ChordOccurrence[] = [];
+  const seen = new Set<string>();
   chords.forEach((chord, index) => {
     if (match(chord, index)) {
+      const key = spotKey(chord);
+      if (seen.has(key)) return;
+      seen.add(key);
       out.push({ index, measure: chord.measure, beat: chord.beat, startSec: chord.startSec, endSec: chord.endSec, chord });
     }
   });
@@ -47,8 +57,12 @@ export interface ChordGroup {
 /** The distinct chords of the piece with their counts, in order of first appearance. */
 export function groupChords(chords: readonly PieceChord[]): ChordGroup[] {
   const by = new Map<string, ChordGroup>();
+  const seen = new Set<string>();
   chords.forEach((chord, index) => {
     const id = chordId(chord);
+    const key = spotKey(chord);
+    if (seen.has(key)) return;
+    seen.add(key);
     const occ: ChordOccurrence = { index, measure: chord.measure, beat: chord.beat, startSec: chord.startSec, endSec: chord.endSec, chord };
     const g = by.get(id);
     if (g) {

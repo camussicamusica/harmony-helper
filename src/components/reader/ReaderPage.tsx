@@ -93,6 +93,22 @@ export function ReaderPage() {
   const [scoreVersion, setScoreVersion] = useState(0);
 
   const [fichaOpen, setFichaOpen] = useState(false);
+  /** Width of the Ficha sheet (px) while it is open next to the score; 0 on phones, where it covers the whole screen. */
+  const [fichaInset, setFichaInset] = useState(0);
+  useEffect(() => {
+    if (!fichaOpen) {
+      setFichaInset(0);
+      return;
+    }
+    const calc = () => {
+      // Same as the sheet's classes: full width below 640px, max-w-md (28rem) from there.
+      const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+      setFichaInset(window.innerWidth >= 640 ? Math.round(28 * rem) : 0);
+    };
+    calc();
+    window.addEventListener("resize", calc);
+    return () => window.removeEventListener("resize", calc);
+  }, [fichaOpen]);
   const [scoreData, setScoreData] = useState<ScoreData | null>(null);
   const [highlight, setHighlight] = useState<ChordHighlight>(null);
   const [focusChord, setFocusChord] = useState<{ index: number; nonce: number } | null>(null);
@@ -414,6 +430,7 @@ export function ReaderPage() {
               occurrenceMark={cursor.current ? cursor.current.index : null}
               highlightChords={highlightIdx}
               focusChord={focusChord}
+              rightInset={view === "estudiar" ? fichaInset : 0}
               hardMeasures={recorrido.progress.hard}
               markMode={markMode}
               onToggleHardMeasure={recorrido.toggleHard}
@@ -426,7 +443,7 @@ export function ReaderPage() {
             />
           )}
         </section>
-        <section className={`shrink-0 bg-background ${tocar ? "" : "sticky bottom-0 z-20 border-t border-border"}`}>
+        <section data-chrome="bottom" className={`shrink-0 bg-background ${tocar ? "" : "sticky bottom-0 z-20 border-t border-border"}`}>
           <PianoView
             isolation={isolation}
             open={ui.pianoOpen}

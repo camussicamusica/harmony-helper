@@ -182,3 +182,14 @@ describe("hoverText location and own note", () => {
     expect(h.chord).toBeNull();
   });
 });
+
+describe("printed positions count once", () => {
+  test("the same measure and beat of the same chord (e.g. a repeat unrolled) is one occurrence", () => {
+    const a = ch(7, "major7", 5, 2);
+    const again = ch(7, "major7", 5, 2); // second pass over the repeat
+    const other = ch(7, "major7", 9, 2);
+    const list = [a, again, other];
+    expect(findChordOccurrences(list, a).map((o) => [o.measure, o.beat])).toEqual([[5, 2], [9, 2]]);
+    expect(groupChords(list)[0].count).toBe(2);
+  });
+});

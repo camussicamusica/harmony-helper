@@ -67,6 +67,26 @@ Esto vale para la nota, el acorde, la tonalidad, el compás y la pieza.
 - **Primer paso posible:** la burbuja del hover se convierte en carta y suma la fotito de la nota en un pentagrama chico.
 - **Estética "programa de los 90":** cartas con borde, título y fotito. Ojo: memoria ViDeus dice "sin brillo 2000"; esto es otro proyecto y el gusto lo decide Sofia, pero preguntarle si quiere el look retro de verdad o solo el formato de carta.
 
+## Oráculo de quintas: los grados de la pieza viven en el círculo (Sofia, 2026-10-27)
+> "Esta es tipo cuarta más 7, primera más 7, tercera, quinta, segunda, séptima. Todo eso me gustaría verlo del círculo… esa información que se cliquea afecta el círculo de alguna manera."
+
+**Idea:** los grados que hoy lista "Acordes de la pieza" (IVmaj7, Imaj7, iii, vi, ii7, "fuera de la escala") se dibujan en el círculo de quintas.
+- **Anillo de afuera:** acordes mayores. **Anillo de adentro:** sus relativos menores.
+- En Re mayor, los acordes de la escala forman una **porción contigua**:
+  - afuera: Sol (IV), Re (I), La (V);
+  - adentro: Mi m (ii), Si m (vi), Fa# m (iii).
+
+  La tonalidad se ve como un "barrio".
+- Cada acorde de la pieza se dibuja en su lugar, con su número romano y su cantidad (×8). El tamaño o el brillo puede mostrar cuánto se usa.
+- **Clic en un acorde de la lista:** se prende su lugar en el círculo, con la flecha a donde quiere ir. A la vez, el navegador lo marca en la partitura (ya existe: `useOccurrenceCursor`).
+- **Clic en una porción del círculo:** el mismo navegador recorre la partitura.
+- **Acordes de afuera de la escala:** aparecen fuera del barrio, y el círculo muestra de qué vecina vienen. Por ejemplo, La menor en Re mayor está al lado del barrio, hacia Sol/Do. Esto responde visualmente su pregunta de "¿con qué escala modula?", junto con la explicación (dominante secundaria / préstamo / modulación).
+- **Base que ya existe:**
+  - `pieceChords`;
+  - los grados y funciones de la Ficha;
+  - `findChordOccurrences(chords, query)`, que acepta una lista o un predicado;
+  - el Círculo cromático (`ChordCircle`), para la forma de cada acorde.
+
 ## Cintas de notas (Sofia, 2026-10-27): construir las dos, A y B, como capas separadas
 > "Como si la nota es naranja, el recorrido es naranja y vamos viendo cómo se entrelazan esas notas con las otras, cuando vuelven a aparecer, cuando empiezan, cuando terminan."
 
