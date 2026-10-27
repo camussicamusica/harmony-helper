@@ -51,6 +51,24 @@ Un panel lateral, "la tele", que espeja lo que tenés debajo del mouse y te lo m
    - los colores;
    - el navegador de acordes por la partitura.
 
+## Cintas de notas (Sofia, 2026-10-27): construir las dos, A y B, como capas separadas
+> "Como si la nota es naranja, el recorrido es naranja y vamos viendo cómo se entrelazan esas notas con las otras, cuando vuelven a aparecer, cuando empiezan, cuando terminan."
+
+> "Como si las notas… las pudiera ver… desde el piso de arriba. Entonces veo como las notas se chorrean hacia la siguiente."
+
+Viene de cómo veía la música cuando tenía sinestesia: cada nota con su color, moviéndose como cintas. Ahora la quiere **afuera**, como herramienta, no adentro.
+
+- **A. Hilos por nota:** un hilo por cada nota (todos los Sol = un hilo color Sol). Muestra cuándo aparece, cuánto dura, cuándo vuelve.
+- **B. Cintas por voz:** la melodía, el bajo y las voces del medio como cintas que pasan de una nota a la siguiente, con degradé de color. Muestran cómo se entrelazan y se cruzan.
+- **Dónde:** una franja debajo de la partitura, alineada compás por compás: la misma música, vista "desde arriba".
+- **Cuidado (lo dijo ella):** los colores en exceso la saturan. Arranca calmo: tocás una nota y se prende solo su hilo, lo demás en gris. Después sumás más, y hay un botón "todas".
+- **Referencia:** Music Animation Machine (Stephen Malinowski). Estudiar la idea, no copiarla.
+- **Ya existe y sirve de base:**
+  - la capa "Línea melódica";
+  - el "Degradé de notas";
+  - los colores de cada nota;
+  - el tiempo de cada nota (`ScheduledNote`).
+
 ## Ideas abiertas que se conectan con esto
 - **Oráculo de quintas:** una pestaña donde tocás una porción del círculo y se prenden los compases de la partitura que viven ahí.
 - **Mapa de saberes:** los escalones en orden, de notas a intervalos, escala, tríadas, grados, funciones, círculo, séptimas, dominantes secundarias y modulación. Cada herramienta dice en qué escalón está.
