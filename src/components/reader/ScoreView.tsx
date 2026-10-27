@@ -108,6 +108,8 @@ function svgEl<K extends keyof SVGElementTagNameMap>(
 interface TooltipState {
   x: number;
   y: number;
+  /** Bubble goes under the system's lowest note or over its highest, never on the notes. */
+  place: "below" | "above";
   line1: string;
   line2: string | null;
   own: { spelled: string; duration: string };
@@ -379,7 +381,7 @@ export function ScoreView({
     setTooltip(null);
   };
 
-  /** Light a note exactly as the old per-head hover did; the bubble sits beside the head, not under the cursor. */
+  /** Light a note exactly as the old per-head hover did; the bubble sits above or below the staff, never on the notes. */
   const showNoteHover = (note: ScheduledNote) => {
     const head = note.headEl?.isConnected ? note.headEl : undefined;
     const shared = (g: SVGGElement) => notesRef.current.filter((n) => n.svgEls?.[0] === g).length > 1;
@@ -397,19 +399,38 @@ export function ScoreView({
     hoverRef.current = { note, els, head, x: NaN, y: NaN };
   };
 
-  /** Bubble position: just right of and below the lit head (re-read live, so Tocar's auto-scroll keeps it attached). */
+  /** Bubble position: centered on the note, under (or, without room, over) the whole system (re-read live, so Tocar auto-scroll keeps it attached). */
   const placeTooltip = (note: ScheduledNote, force: boolean) => {
     const cur = hoverRef.current;
     if (!cur) return;
     const r = (note.headEl?.isConnected ? note.headEl : note.svgEls?.[0])?.getBoundingClientRect();
     if (!r) return;
-    const x = Math.round(r.right);
-    const y = Math.round(r.bottom - 6);
+    // Vertical extent of this system near the note: staff lines plus every notehead within ±300px.
+    const sys = note.system ?? 0;
+    let top = r.top;
+    let bottom = r.bottom;
+    const wr = wrapRef.current?.getBoundingClientRect();
+    const rows = staffRowsRef.current.get(sys);
+    if (wr && rows?.length) {
+      top = Math.min(top, wr.top + rows[0].top);
+      bottom = Math.max(bottom, wr.top + rows[rows.length - 1].bottom);
+    }
+    for (const n of notesRef.current) {
+      if ((n.system ?? 0) !== sys || !n.headEl?.isConnected) continue;
+      const hr = n.headEl.getBoundingClientRect();
+      if (!hr.width || Math.abs(hr.left - r.left) > 300) continue;
+      top = Math.min(top, hr.top);
+      bottom = Math.max(bottom, hr.bottom);
+    }
+    const need = 150;
+    const place: "below" | "above" = window.innerHeight - bottom >= need || top < need ? "below" : "above";
+    const x = Math.round(r.left + r.width / 2);
+    const y = Math.round(place === "below" ? bottom + 10 : top - 10);
     if (!force && x === cur.x && y === cur.y) return;
     cur.x = x;
     cur.y = y;
     const live = notesRef.current.find((n) => n.id === note.id) ?? note;
-    setTooltip({ x, y, ...hoverText(live, notesRef.current) });
+    setTooltip({ x, y, place, ...hoverText(live, notesRef.current) });
   };
 
   /** Pointer (client px) -> nearest note zone -> hover. Overlays with their own hit target keep priority. */
@@ -1446,7 +1467,6 @@ export function ScoreView({
   };
 
   const tocar = view === "tocar";
-  const tipRight = tooltip ? tooltip.x > window.innerWidth - 280 : false;
 
   return (
     <div className={tocar ? "relative h-full w-full bg-background" : "relative w-full bg-background"}>
@@ -1511,9 +1531,9 @@ export function ScoreView({
         <div
           className="pointer-events-none fixed z-50 max-w-[260px] rounded-md border border-border bg-popover px-2.5 py-1.5 text-xs text-popover-foreground shadow-md"
           style={{
-            left: tooltip.x + (tipRight ? -14 : 14),
-            top: tooltip.y + 16,
-            transform: tipRight ? "translateX(-100%)" : undefined,
+            left: Math.min(Math.max(tooltip.x, 140), window.innerWidth - 140),
+            top: tooltip.y,
+            transform: tooltip.place === "above" ? "translate(-50%, -100%)" : "translateX(-50%)",
           }}
         >
           <div className="flex items-baseline gap-2" data-testid="tip-note">
