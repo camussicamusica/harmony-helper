@@ -82,6 +82,15 @@ Cuando abrís una partitura nueva, se detiene lo que estaba sonando y se reinici
 7. En la app, apretá **"Abrir partitura"** y elegí ese `.mxl`.
 8. Revisá las notas: el lector siempre se equivoca en algo.
 
+**Más fácil: con clic derecho en el Finder**
+1. En el Finder, hacé clic derecho (o Control + clic) sobre el PDF.
+2. Elegí **Acciones rápidas → "Pasar a MusicXML"**. Si no aparece ahí, buscalo en **Servicios**, al final del menú.
+3. Arriba a la derecha aparece un aviso: "Leyendo…".
+4. Esperá. Cuando termina aparece otro aviso: **"Listo"**. El `.mxl` queda al lado del PDF.
+5. Podés elegir varios PDFs a la vez y hacer clic derecho sobre la selección.
+
+Si un día la opción desaparece: abrí la Terminal, escribí `~/code/harmony-helper/scripts/install-finder-action.sh` y apretá Enter.
+
 Qué esperar:
 - **PDFs hechos en un programa** (como los de Fito o la Gymnopédie): salen bastante bien.
 - **Escaneos borrosos, fotos o partituras a mano:** salen con más errores.
