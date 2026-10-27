@@ -23,7 +23,6 @@ export function hashText(text: string): string {
 }
 
 const OVERRIDE_PREFIX = "hh.keyOverride.v1:";
-const OVERLAY_KEY = "hh.chordOverlay.v1";
 
 export interface Ficha {
   detection: KeyResult | null;
@@ -95,27 +94,6 @@ export function useFicha(xml: string, data: ScoreData | null, bpm: number, enabl
   }, [detection]);
 
   return { detection, key, overridden: !!overrideId, overrideId, setOverride, keyIds, triads, sevenths, chords, meta };
-}
-
-/** "Acordes sobre la partitura" switch, remembered in localStorage. */
-export function useChordOverlayPref(): [boolean, (v: boolean) => void] {
-  const [on, setOn] = useState(false);
-  useEffect(() => {
-    try {
-      if (localStorage.getItem(OVERLAY_KEY) === "1") setOn(true);
-    } catch {
-      /* ignore */
-    }
-  }, []);
-  const set = (v: boolean) => {
-    setOn(v);
-    try {
-      localStorage.setItem(OVERLAY_KEY, v ? "1" : "0");
-    } catch {
-      /* ignore */
-    }
-  };
-  return [on, set];
 }
 
 /** Indices of the piece chords a highlight refers to. */

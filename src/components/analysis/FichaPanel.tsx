@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronDown, Play, Square } from "lucide-react";
+import { ChordNoteChips } from "@/components/analysis/ChordNoteChips";
 import { ChordCircle, type CircleChord } from "@/components/analysis/ChordCircle";
 import { roleColor } from "@/lib/colors/roleColor";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -21,7 +22,8 @@ import {
   voiceChordMidi,
   type ScaleChord,
 } from "@/lib/music/analysis/chords";
-import type { PieceChord } from "@/lib/music/analysis/pieceChords";
+import { groupChords, occurrenceLabel } from "@/lib/music/analysis/occurrences";
+import type { OccurrenceCursor } from "@/lib/music/analysis/useOccurrenceCursor";
 import type { Ficha, ChordHighlight } from "@/lib/music/analysis/useFicha";
 import { playChordMidi, playChordsInOrder, playNoteMidi, playSequence, stopAnalysisAudio } from "@/lib/music/analysis/audio";
 
@@ -29,8 +31,8 @@ interface Props {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   ficha: Ficha;
-  showChordMarks: boolean;
-  onShowChordMarksChange: (v: boolean) => void;
+  /** Walks through the occurrences of a chord on the score (Acordes de la pieza). */
+  cursor: OccurrenceCursor;
   highlight: ChordHighlight;
   onHighlightChange: (h: ChordHighlight) => void;
   onFocusChord: (index: number) => void;
@@ -88,8 +90,7 @@ export function FichaPanel({
   open,
   onOpenChange,
   ficha,
-  showChordMarks,
-  onShowChordMarksChange,
+  cursor,
   highlight,
   onHighlightChange,
   onFocusChord,
@@ -105,6 +106,7 @@ export function FichaPanel({
   const [pieceIdx, setPieceIdx] = useState(0);
 
   const scale = useSevenths ? sevenths : triads;
+  const groups = groupChords(chords);
   const countByDegree = new Map<number, number>();
   for (const c of chords) if (c.degree) countByDegree.set(c.degree, (countByDegree.get(c.degree) ?? 0) + 1);
 
@@ -140,14 +142,6 @@ export function FichaPanel({
     setScaleIdx(c.degree - 1);
     void playChordMidi(voiceChordMidi(c.pcs));
     onHighlightChange(highlight?.kind === "degree" && highlight.degree === c.degree ? null : { kind: "degree", degree: c.degree });
-  };
-
-  const clickPieceChord = (i: number, c: PieceChord) => {
-    setCircleSource("piece");
-    setPieceIdx(i);
-    void playChordMidi(voiceChordMidi(c.pcs));
-    onHighlightChange({ kind: "chord", index: i });
-    onFocusChord(i);
   };
 
   // ---- Círculo: the chord being drawn ----
@@ -360,7 +354,7 @@ export function FichaPanel({
                       >
                         {FUNCTION_SHORT[c.fn]}
                       </span>
-                      <span className="text-center text-[9px] leading-tight text-muted-foreground">{c.notesEs.join(" ")}</span>
+                      <ChordNoteChips spelled={c.notes} label="short" className="justify-center gap-0.5 [&>span]:px-1 [&>span]:text-[9px]" />
                     </button>
                   );
                 })}
@@ -370,48 +364,81 @@ export function FichaPanel({
 
             {/* d. Acordes de la pieza */}
             <Section title="Acordes de la pieza" focus={focus}>
-              <label className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
-                <Switch checked={showChordMarks} onCheckedChange={onShowChordMarksChange} />
-                <span className={showChordMarks ? "italic text-foreground" : ""}>Acordes sobre la partitura</span>
-              </label>
-              {chords.length === 0 ? (
+              {groups.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No encontré acordes completos (hay pocas notas juntas).</p>
               ) : (
-                <ol className="flex flex-col gap-1">
-                  {chords.map((c, i) => {
-                    const lit = highlight?.kind === "chord" && highlight.index === i;
-                    const color = roleColor(roles, c.roleId);
-                    return (
-                      <li key={`${c.startSec}-${i}`}>
-                        <button
-                          type="button"
-                          onClick={() => clickPieceChord(i, c)}
-                          aria-pressed={lit}
-                          className={`flex w-full items-center gap-2 rounded-md px-1.5 py-1 text-left hover:bg-accent ${lit ? "bg-accent" : ""}`}
-                        >
-                          <span className="w-16 shrink-0 text-[11px] tabular-nums text-muted-foreground">
-                            comp. {c.measure}
-                            {c.beat > 1 ? `·${c.beat}` : ""}
-                          </span>
-                          <span
-                            className="rounded-full bg-background px-2.5 py-0.5 text-xs font-semibold"
-                            style={{ border: `2px ${c.inScale ? "solid" : "dashed"} ${color}` }}
-                          >
-                            {c.name}
-                            {c.bassEs ? <span className="font-normal text-muted-foreground"> /{c.bassEs}</span> : null}
-                          </span>
-                          {c.inScale ? (
-                            <span className="text-xs font-semibold">{c.roman}</span>
-                          ) : (
-                            <span className="text-[11px] italic" style={{ color: outsideColor }}>
-                              fuera de la escala
-                            </span>
-                          )}
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ol>
+                <>
+                  <p className="mb-2 text-[11px] text-muted-foreground">
+                    Tocá un acorde para ir a su 1ª aparición en la partitura. Tocalo de nuevo para ir a la siguiente.
+                  </p>
+                  <ul className="flex flex-col gap-1.5">
+                    {groups.map((g) => {
+                      const c = g.chord;
+                      const active = cursor.activeId === g.id;
+                      const color = roleColor(roles, c.roleId);
+                      return (
+                        <li key={g.id} className={`rounded-md border px-1.5 py-1 ${active ? "border-foreground/40 bg-accent/60" : "border-transparent"}`}>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                void playChordMidi(voiceChordMidi(c.pcs));
+                                cursor.select(g.id, c);
+                              }}
+                              aria-pressed={active}
+                              aria-label={`${c.name}, ${g.count} ${g.count === 1 ? "vez" : "veces"}. Ir a la siguiente aparición`}
+                              className="flex items-center gap-2 rounded-full px-1 py-0.5 text-left hover:bg-accent"
+                            >
+                              <span
+                                className="rounded-full bg-background px-2.5 py-0.5 text-xs font-semibold"
+                                style={{ border: `2px ${c.inScale ? "solid" : "dashed"} ${color}` }}
+                              >
+                                {c.name} <span className="font-normal text-muted-foreground">×{g.count}</span>
+                              </span>
+                              {c.inScale ? (
+                                <span className="text-xs font-semibold">{c.roman}</span>
+                              ) : (
+                                <span className="text-[11px] italic" style={{ color: outsideColor }}>
+                                  fuera de la escala
+                                </span>
+                              )}
+                            </button>
+                            {active && cursor.current && (
+                              <span className="ml-auto flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => cursor.step(-1)}
+                                  aria-label="Aparición anterior"
+                                  className="rounded border border-border px-1.5 text-xs hover:bg-accent"
+                                >
+                                  ◀
+                                </button>
+                                <span
+                                  data-testid="occurrence-position"
+                                  aria-live="polite"
+                                  className="rounded border border-border bg-background px-2 py-0.5 text-[11px] tabular-nums"
+                                >
+                                  {occurrenceLabel(cursor.current, cursor.pos, cursor.occurrences.length)}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => cursor.step(1)}
+                                  aria-label="Aparición siguiente"
+                                  className="rounded border border-border px-1.5 text-xs hover:bg-accent"
+                                >
+                                  ▶
+                                </button>
+                              </span>
+                            )}
+                          </div>
+                          <div className="mt-1 pl-1">
+                            <ChordNoteChips spelled={c.notes} />
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </>
               )}
             </Section>
           </>

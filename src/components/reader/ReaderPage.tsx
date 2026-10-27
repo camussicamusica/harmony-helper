@@ -9,11 +9,12 @@ import type { StepAction } from "@/lib/music/recorrido/steps";
 import {
   hashText,
   highlightedIndices,
-  useChordOverlayPref,
   useFicha,
   type ChordHighlight,
   type ScoreData,
 } from "@/lib/music/analysis/useFicha";
+import { useOccurrenceCursor } from "@/lib/music/analysis/useOccurrenceCursor";
+import type { ChordOccurrence } from "@/lib/music/analysis/occurrences";
 import { useDegradeLayer, usePatternLayer } from "@/lib/music/analysis/usePatternLayer";
 import type { ScoreMeta } from "@/lib/music/analysis/scoreMeta";
 import { SAMPLE_MUSICXML } from "@/lib/music/sampleScore";
@@ -93,7 +94,6 @@ export function ReaderPage() {
 
   const [fichaOpen, setFichaOpen] = useState(false);
   const [scoreData, setScoreData] = useState<ScoreData | null>(null);
-  const [showChordMarks, setShowChordMarks] = useChordOverlayPref();
   const [highlight, setHighlight] = useState<ChordHighlight>(null);
   const [focusChord, setFocusChord] = useState<{ index: number; nonce: number } | null>(null);
   const [recorridoOpen, setRecorridoOpen] = useState(false);
@@ -110,7 +110,7 @@ export function ReaderPage() {
   const scoreHashRef = useRef(scoreHash);
   scoreHashRef.current = scoreHash;
   const recorrido = useRecorrido(scoreHash);
-  const ficha = useFicha(xml, scoreData, bpm, fichaOpen || showChordMarks || recorridoOpen);
+  const ficha = useFicha(xml, scoreData, bpm, fichaOpen || recorridoOpen);
   const patternLayer = usePatternLayer(scoreHash, scoreData);
   const degradeLayer = useDegradeLayer();
   const [degradeCap, setDegradeCap] = useState(1);
@@ -130,6 +130,10 @@ export function ReaderPage() {
   const degradeView = useMemo(
     () => (degradeLayer.options.on ? { intensity: degradeLayer.options.intensity } : null),
     [degradeLayer.options.on, degradeLayer.options.intensity],
+  );
+  const cursor = useOccurrenceCursor(
+    ficha.chords,
+    useCallback((occ: ChordOccurrence) => setFocusChord({ index: occ.index, nonce: Date.now() }), []),
   );
   const highlightIdx = useMemo(() => highlightedIndices(highlight, ficha.chords), [highlight, ficha.chords]);
 
@@ -407,7 +411,7 @@ export function ReaderPage() {
               onNotes={handleNotes}
               onScoreData={handleScoreData}
               chordMarks={ficha.chords}
-              showChordMarks={showChordMarks}
+              occurrenceMark={cursor.current ? cursor.current.index : null}
               highlightChords={highlightIdx}
               focusChord={focusChord}
               hardMeasures={recorrido.progress.hard}
@@ -434,8 +438,7 @@ export function ReaderPage() {
         open={fichaOpen}
         onOpenChange={setFichaOpen}
         ficha={ficha}
-        showChordMarks={showChordMarks}
-        onShowChordMarksChange={setShowChordMarks}
+        cursor={cursor}
         highlight={highlight}
         onHighlightChange={setHighlight}
         onFocusChord={(index) => setFocusChord({ index, nonce: Date.now() })}

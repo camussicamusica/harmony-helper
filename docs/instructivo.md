@@ -396,16 +396,42 @@ Muestra un acorde a la vez sobre las 12 notas, en círculo.
 
 ### 8.5 Acordes de la pieza
 
-1. Lista, en orden, de los acordes que la app encontró en tu pieza. Ejemplo: "comp. 2·2  Re7 /Fa#  V7". Eso significa compás 2, tiempo 2, acorde Re7, con Fa# en el bajo, quinto grado.
-2. Tocá un acorde de la lista: suena, la partitura se desplaza hasta ahí y lo marca. También se muestra en el "Círculo" (en modo "Pieza").
-3. Si un acorde no es de la escala, tiene borde punteado y dice "fuera de la escala".
-4. Si dice "No encontré acordes completos (hay pocas notas juntas).", la pieza no tiene suficientes notas juntas. Pasa con melodías de una sola voz.
+**Acorde:** varias notas que suenan juntas. La app los encuentra sola en tu pieza.
 
-### 8.6 Acordes sobre la partitura
+1. Abrí la "Ficha" (botón arriba a la derecha).
+2. Bajá hasta la sección "Acordes de la pieza".
+3. Vas a ver una lista con cada acorde distinto y cuántas veces aparece. Ejemplo: "Sol mayor ×5".
+4. Al lado del nombre aparece el grado. Ejemplo: "I", "V7".
+5. Abajo de cada acorde hay una cajita por cada nota, con TU color de esa nota. Ejemplo: "Sol (G)", "Si (B)", "Re (D)".
+6. Si apagaste el color de una nota en "Colores", su cajita sale blanca, sin color.
+7. Si un acorde no es de la escala, tiene borde punteado y dice "fuera de la escala".
+8. Si dice "No encontré acordes completos (hay pocas notas juntas).", la pieza no tiene suficientes notas juntas. Pasa con melodías de una sola voz.
 
-1. En "Acordes de la pieza", prendé el interruptor "Acordes sobre la partitura".
-2. Aparecen circulitos con el nombre del acorde, arriba de cada renglón de la partitura, cada vez que cambia el acorde.
-3. Apagá el interruptor para esconderlos.
+### 8.6 Recorrer un acorde por la partitura
+
+1. En "Acordes de la pieza", tocá el botón de un acorde. Ejemplo: "Sol mayor ×5".
+2. El acorde suena.
+3. La partitura se desplaza hasta la 1ª aparición de ese acorde.
+4. Sobre la partitura aparece una caja suave, del color del acorde, alrededor de ese lugar.
+5. Al lado del botón aparece una cajita con la posición. Ejemplo: "compás 1, tiempo 1 · 1 de 5".
+6. Esa cajita dice: compás 1, tiempo 1 del compás, es la aparición 1 de 5.
+7. Tocá el mismo botón otra vez: va a la 2ª aparición. Ejemplo: "compás 2, tiempo 1 · 2 de 5".
+8. Tocalo otra vez: 3ª aparición. Y así.
+9. Después de la última, vuelve a la 1ª.
+10. Para ir para atrás, tocá "◀". Para ir para adelante, tocá "▶".
+11. Si tocás el botón de otro acorde, empieza desde su 1ª aparición.
+12. En "Tocar" la partitura se mueve hacia el costado. En "Estudiar" se mueve hacia abajo o arriba. Funciona igual en las dos.
+13. La caja queda hasta que toques otro acorde o abras otra partitura.
+
+**Tiempo:** el golpe del compás. En 4/4 hay 4 tiempos: 1, 2, 3, 4.
+
+### 8.7 Cajitas de notas al pasar el mouse
+
+1. En la partitura, pasá el mouse sobre una nota que suena junto con otras.
+2. Aparece un globito con el nombre de la nota, el compás y, si son 3 o más notas, el nombre del acorde.
+3. Debajo hay una cajita por cada nota del acorde, con tu color. Ejemplo: "Re (D)", "Fa# (F#)", "La (A)", "Do (C)".
+4. Si apagaste el color de esa nota en "Colores", la cajita sale blanca.
+5. Las mismas cajitas aparecen en "Acordes de la escala" y en "Acordes de la pieza" de la Ficha.
 
 La app adivina los acordes por las notas que suenan. Si se equivoca, la pieza puede estar usando notas de paso. Es una guía, no una verdad.
 

@@ -3,6 +3,7 @@ import { PLAIN_COLOR } from "@/lib/colors/defaults";
 import { readableTextOn } from "@/lib/colors/color";
 import { noteColor, useColors } from "@/lib/colors/store";
 import { roleColor } from "@/lib/colors/roleColor";
+import { noteChipStyle } from "@/lib/colors/noteChip";
 import { solfegeName } from "@/lib/music/naming";
 import type { KeyInfo } from "@/lib/music/analysis/key";
 import { FUNCTION_ES, FUNCTION_ROLE, type ChordFunction } from "@/lib/music/analysis/chords";
@@ -227,6 +228,21 @@ export function ChordCircle({ keyInfo, chord, tonicPcs }: Props) {
             ) : (
               <circle cx={p.x} cy={p.y} r={scaleNote ? 3.2 : 2} className="fill-muted-foreground" opacity={scaleNote ? 0.9 : 0.4} />
             )}
+            {chordNote ? (
+              (() => {
+                const label = solfegeName(names[pc]);
+                const st = noteChipStyle(pc, roles);
+                const w = label.length * 8.6 + 12;
+                return (
+                  <g data-chord-chip={pc} data-neutral={st.neutral ? "1" : "0"}>
+                    <rect x={l.x - w / 2} y={l.y - 11} width={w} height={22} rx={6} fill={st.background} stroke={st.border} strokeWidth="1.5" />
+                    <text x={l.x} y={l.y} textAnchor="middle" dominantBaseline="central" fontSize="13" fontWeight={700} fill={st.color}>
+                      {label}
+                    </text>
+                  </g>
+                );
+              })()
+            ) : (
             <text
               x={l.x}
               y={l.y}
@@ -239,6 +255,7 @@ export function ChordCircle({ keyInfo, chord, tonicPcs }: Props) {
             >
               {solfegeName(names[pc])}
             </text>
+            )}
           </g>
         );
       })}

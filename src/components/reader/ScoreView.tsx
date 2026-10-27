@@ -19,6 +19,7 @@ import { IntervalLegend } from "./IntervalLegend";
 import { readScoreMeta, type ScoreMeta } from "@/lib/music/analysis/scoreMeta";
 import type { PieceChord } from "@/lib/music/analysis/pieceChords";
 import { getRole } from "@/lib/colors/store";
+import { ChordNoteChips } from "@/components/analysis/ChordNoteChips";
 import { intervalRole, intervalSignature, noteSignature, noteTargetOn, subscribe as subscribeColors } from "@/lib/colors/store";
 import type { Hand, IsolationMode, ScheduledNote, ScoreView as ViewMode } from "@/lib/music/types";
 import type { Pattern, PatternScope } from "@/lib/music/analysis/patterns";
@@ -46,11 +47,12 @@ interface Props {
   onNotes: (notes: ScheduledNote[]) => void;
   /** Notes plus key/time/measure info for the Ficha analysis. */
   onScoreData?: (notes: ScheduledNote[], meta: ScoreMeta) => void;
-  /** Chords of the piece, drawn above the staff when `showChordMarks`. */
+  /** Chords of the piece (indices below point into this list). */
   chordMarks?: PieceChord[];
-  showChordMarks?: boolean;
   /** Indices into `chordMarks` to light up. */
   highlightChords?: number[];
+  /** Index into `chordMarks` of the occurrence she is walking through: a soft box in the chord's color. */
+  occurrenceMark?: number | null;
   /** Scroll the score to this chord (nonce makes repeated requests work). */
   focusChord?: { index: number; nonce: number } | null;
   /** Measure numbers she marked as hard (Recorrido): drawn as amber boxes. */
@@ -106,6 +108,8 @@ interface TooltipState {
   y: number;
   line1: string;
   line2: string | null;
+  /** Chord tones (spelled), shown as chips in her note colors. */
+  chord?: { name: string | null; tones: string[] } | null;
 }
 
 export function ScoreView({
@@ -121,7 +125,7 @@ export function ScoreView({
   onNotes,
   onScoreData,
   chordMarks = [],
-  showChordMarks = false,
+  occurrenceMark = null,
   highlightChords = [],
   focusChord = null,
   hardMeasures = [],
@@ -165,8 +169,8 @@ export function ScoreView({
   onScoreDataRef.current = onScoreData;
   const chordMarksRef = useRef(chordMarks);
   chordMarksRef.current = chordMarks;
-  const showChordMarksRef = useRef(showChordMarks);
-  showChordMarksRef.current = showChordMarks;
+  const occurrenceMarkRef = useRef(occurrenceMark);
+  occurrenceMarkRef.current = occurrenceMark;
   const highlightRef = useRef(highlightChords);
   highlightRef.current = highlightChords;
   const hardRef = useRef(hardMeasures);
@@ -340,7 +344,10 @@ export function ScoreView({
     return { x, y };
   };
 
-  /** "Acordes sobre la partitura": a small circle above the top staff at each chord change. */
+  /**
+   * Chord highlight on the score: noteheads of the highlighted chords get the `chord-hl` class, and the chord she
+   * is walking through (occurrence navigator) gets a soft box in the chord's color around its beat.
+   */
   const drawChords = () => {
     const svg = chordSvgRef.current;
     const wrap = wrapRef.current;
@@ -352,54 +359,46 @@ export function ScoreView({
     for (const n of notesRef.current) n.svgEls?.forEach((el) => el.classList.remove("chord-hl"));
     const marks = chordMarksRef.current;
     const hl = new Set(highlightRef.current);
-    const hasHl = hl.size > 0;
-    if (hasHl) {
+    if (hl.size > 0) {
       const byId = new Map(notesRef.current.map((n) => [n.id, n]));
       for (const i of hl) {
         for (const id of marks[i]?.noteIds ?? []) byId.get(id)?.svgEls?.forEach((el) => el.classList.add("chord-hl"));
       }
     }
-    if (!showChordMarksRef.current) return;
-    const outsideColor = getRole("chord-outsideScale")?.color ?? "#78716C";
-    marks.forEach((chord, i) => {
-      const pos = chordPosition(chord);
-      if (!pos) return;
-      const color = getRole(chord.roleId)?.color ?? outsideColor;
-      const label = chord.inScale ? chord.roman! : chord.rootEs;
-      const r = Math.max(11, 4.5 + label.length * 2.9);
-      const lit = hl.has(i);
-      const g = svgEl("g", { opacity: hasHl && !lit ? 0.3 : 1 });
-      if (lit) {
-        const pulse = svgEl("circle", { cx: pos.x, cy: pos.y, r, fill: "none", stroke: color, "stroke-width": 2, opacity: 0.6 });
-        pulse.appendChild(svgEl("animate", { attributeName: "r", values: `${r};${r + 9};${r}`, dur: "1.4s", repeatCount: "indefinite" }));
-        pulse.appendChild(svgEl("animate", { attributeName: "opacity", values: "0.7;0;0.7", dur: "1.4s", repeatCount: "indefinite" }));
-        g.appendChild(pulse);
-      }
-      g.appendChild(
-        svgEl("circle", {
-          cx: pos.x,
-          cy: pos.y,
-          r,
-          fill: "#ffffff",
-          "fill-opacity": 0.92,
-          stroke: color,
-          "stroke-width": lit ? 3.5 : 2,
-          ...(chord.inScale ? {} : { "stroke-dasharray": "4 3" }),
-        }),
-      );
-      const t = svgEl("text", {
-        x: pos.x,
-        y: pos.y + 3.6,
-        "text-anchor": "middle",
-        "font-size": 10.5,
-        "font-weight": 700,
-        fill: "#111827",
-      });
-      t.textContent = label;
-      g.appendChild(t);
-      svg.appendChild(g);
-    });
+    const occ = occurrenceMarkRef.current;
+    const chord = occ === null ? undefined : marks[occ];
+    if (!chord) return;
+    const byId = new Map(notesRef.current.map((n) => [n.id, n]));
+    const ns = chord.noteIds.map((id) => byId.get(id)).filter((n): n is ScheduledNote => !!n && n.cx !== undefined);
+    if (!ns.length) return;
+    const sys = ns[0].system ?? 0;
+    const inSys = ns.filter((n) => (n.system ?? 0) === sys);
+    const x0 = Math.min(...inSys.map((n) => n.cx!)) - 22;
+    const x1 = Math.max(Math.max(...inSys.map((n) => n.cx!)) + 22, x0 + 60);
+    const mb = measureBoxes().get(chord.measure);
+    const ys = inSys.map((n) => n.cy!);
+    const top = systemTopRef.current.get(sys);
+    const y0 = mb?.y0 ?? (top !== undefined ? Math.min(top, Math.min(...ys) - 8) : Math.min(...ys) - 30) - 8;
+    const y1 = mb?.y1 ?? Math.max(...ys) + 30;
+    const color = getRole(chord.roleId)?.color ?? getRole("chord-outsideScale")?.color ?? "#78716C";
+    const g = svgEl("g", { "data-occurrence-box": `${chord.measure}.${chord.beat}` });
+    g.appendChild(
+      svgEl("rect", {
+        x: x0,
+        y: y0,
+        width: x1 - x0,
+        height: y1 - y0,
+        rx: 8,
+        fill: color,
+        "fill-opacity": 0.2,
+        stroke: color,
+        "stroke-width": 2.5,
+        ...(chord.inScale ? {} : { "stroke-dasharray": "6 4" }),
+      }),
+    );
+    svg.appendChild(g);
   };
+
 
   /** Box (px, relative to the wrapper) of every measure that has notes: x from the neighbours' midpoints, y over the system. */
   const measureBoxes = (): Map<number, { x0: number; x1: number; y0: number; y1: number }> => {
@@ -1226,12 +1225,12 @@ export function ScoreView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [line, intervals, isolation, lineMode]);
 
-  // Chord marks / highlight — redraw the chord overlay.
+  // Chord highlight / occurrence box — redraw the chord overlay.
   useEffect(() => {
     drawChords();
     drawHard();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chordMarks, showChordMarks, highlightChords]);
+  }, [chordMarks, occurrenceMark, highlightChords]);
 
   // Pattern boxes / degradé — redraw when the layer or its settings change.
   useEffect(() => {
@@ -1407,7 +1406,14 @@ export function ScoreView({
           }}
         >
           <div className="font-medium">{tooltip.line1}</div>
-          {tooltip.line2 && <div className="mt-0.5 text-muted-foreground">{tooltip.line2}</div>}
+          {tooltip.chord ? (
+            <div className="mt-1 flex flex-col gap-1" data-testid="chord-tooltip">
+              {tooltip.chord.name && <div className="font-medium">{tooltip.chord.name}</div>}
+              <ChordNoteChips spelled={tooltip.chord.tones} />
+            </div>
+          ) : (
+            tooltip.line2 && <div className="mt-0.5 text-muted-foreground">{tooltip.line2}</div>
+          )}
         </div>
       )}
 

@@ -168,17 +168,21 @@ export function soundingAt(note: ScheduledNote, all: ScheduledNote[]): Scheduled
 export interface HoverText {
   line1: string;
   line2: string | null;
+  /** The notes sounding together (spelled, as in line2) so the UI can draw each one as a colored chip. */
+  chord: { name: string | null; tones: string[] } | null;
 }
 
 export function hoverText(note: ScheduledNote, all: ScheduledNote[]): HoverText {
   const line1 = `${noteLabel(note.spelledName)} · ${note.durationName} · compás ${note.measure}`;
   const group = soundingAt(note, all);
   let line2: string | null = null;
+  let chordInfo: HoverText["chord"] = null;
   const distinct = new Set(group.map((n) => n.midi % 12));
   if (group.length >= 2 && distinct.size >= 2) {
     const names = group.map((n) => solfegeName(n.spelledName));
     const chord = chordName(group.map((n) => n.spelledName));
     line2 = chord ? `${chord} · ${names.join(" · ")}` : names.join(" · ");
+    chordInfo = { name: chord, tones: group.map((n) => n.spelledName) };
   }
-  return { line1, line2 };
+  return { line1, line2, chord: chordInfo };
 }
