@@ -10,16 +10,16 @@ tags: [harmony-helper, pruebas, tests]
 
 Una prueba es una **pregunta guardada con la respuesta que ya sabemos**. Por ejemplo: "¿Fa#-La-Do# se llama Fa# menor?" La respuesta correcta es "sí". La computadora le hace la pregunta al programa, mira lo que contesta y compara. Si coincide, la prueba **pasa** (pass). Si no coincide, **falla** (fail).
 
-Hoy hay 190 preguntas guardadas. Se corren solas en un segundo. Sirven para que, cuando agregamos algo nuevo, no se rompa en silencio algo que ya andaba.
+Hoy hay 212 preguntas guardadas. Se corren solas en un segundo. Sirven para que, cuando agregamos algo nuevo, no se rompa en silencio algo que ya andaba.
 
-Las pruebas viven en la carpeta `tests/` del proyecto. Cubren la lógica musical (tonalidades, acordes, nombres, círculo, teclado MIDI, ejercicios del Recorrido, archivos .mxl, colores, cajas de patrones y degradé). No cubren cómo se ve la pantalla.
+Las pruebas viven en la carpeta `tests/` del proyecto. Cubren la lógica musical (tonalidades, acordes, nombres, círculo, teclado MIDI, ejercicios del Recorrido, archivos .mxl, colores, cajas de patrones y degradé y tempo). No cubren cómo se ve la pantalla.
 
 ## Cómo correrlas
 
 1. Abrí la Terminal.
 2. Escribí `cd ~/code/harmony-helper` y apretá Enter. Esto te lleva a la carpeta del proyecto.
 3. Escribí `~/.bun/bin/bun run check` y apretá Enter.
-4. Esperá unos segundos. `check` hace dos cosas seguidas: primero revisa que el código esté bien escrito (tsc) y después corre las 190 preguntas.
+4. Esperá unos segundos. `check` hace dos cosas seguidas: primero revisa que el código esté bien escrito (tsc) y después corre las 212 preguntas.
 5. Mirá las últimas líneas del resultado (ver la sección siguiente).
 
 Si querés correr solo las preguntas, sin la revisión de escritura, usá `~/.bun/bin/bun test` en el paso 3.
@@ -27,10 +27,10 @@ Si querés correr solo las preguntas, sin la revisión de escritura, usá `~/.bu
 ## Qué significa lo que aparece
 
 1. **Todo bien.** Las últimas líneas dicen algo así:
-   - `190 pass`
+   - `212 pass`
    - `0 fail`
 
-   Quiere decir que las 190 respuestas coinciden. Podés seguir tranquila.
+   Quiere decir que las 212 respuestas coinciden. Podés seguir tranquila.
 2. **Algo falló.** Aparece `(fail)` con el nombre de la pregunta, la respuesta esperada (`Expected`) y la que dio el programa (`Received`). Quiere decir que algo que antes andaba dejó de andar. No lo arregles a mano: copiá ese texto y pegáselo a Claude.
 3. **Error de escritura (tsc).** Si antes de las pruebas aparece una lista de errores con nombres de archivo y números de línea, es la revisión de escritura. Las pruebas ni empiezan hasta que eso se arregle.
 4. **`skip` o `todo`.** Una pregunta anotada como pendiente: sabemos de un problema, está explicado en un comentario dentro de la prueba y todavía no se arregló. Hoy no hay ninguna.
@@ -127,6 +127,16 @@ Se instala una sola vez por copia del proyecto:
 | ¿Una nota con el color apagado no agrega color al degradé? | Sí |
 | ¿Con la intensidad de fábrica (35%) las notas negras se leen con contraste 4,5:1 o más sobre los 12 colores? | Sí |
 | ¿Si un color es muy oscuro, la intensidad se limita sola para que las notas negras se lean? | Sí |
+| ¿El tempo se queda entre 20 y 220 bpm, y un valor raro (no es número) vuelve a 72? | Sí |
+| ¿"+" y "−" mueven 5 bpm, y con Shift 1 bpm, sin salirse del rango? | Sí |
+| ¿Un `<sound tempo="66"/>` de la partitura se lee como 66 negras por minuto? | Sí |
+| ¿Una indicación de metrónomo se pasa a negras (blanca = 60 son 120; blanca con puntillo = 40 son 120; negra con puntillo = 60 son 90; corchea = 144 son 72)? | Sí |
+| ¿Si hay dos indicaciones de tempo, gana la primera del archivo? | Sí |
+| ¿Si la partitura no escribe tempo (como la de ejemplo), se devuelve "sin tempo"? | Sí |
+| ¿50%, 75% y 100% se calculan sobre el tempo de la partitura (o sobre 72 si no tiene), y el botón activo es el correcto? | Sí |
+| ¿Se usa primero el tempo guardado, después el escrito, y por último 72? | Sí |
+| ¿El tempo se guarda y se lee por partitura, y un guardado roto se ignora? | Sí |
+| ¿Cambiar el tempo mientras suena mantiene el mismo punto de la pieza (12 s a 60 bpm son 6 s a 120 bpm)? | Sí |
 
 ## Qué no cubren
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { TopBar } from "./TopBar";
 import { ScoreView } from "./ScoreView";
 import { PianoView } from "./PianoView";
@@ -23,9 +23,20 @@ import {
   pause,
   play,
   playRange,
+  requestRetempo,
   setIsolation,
   stop,
 } from "@/lib/music/scheduler";
+import {
+  DEFAULT_STUDY_BPM,
+  baseTempo,
+  clampBpm,
+  loadSavedTempo,
+  parseWrittenTempo,
+  resolveInitialBpm,
+  saveTempo,
+  stepBpm,
+} from "@/lib/music/tempo";
 import { useAlwaysLabels, useLineMode } from "@/lib/music/lineMode";
 import { applyInterfaceVars } from "@/lib/colors/store";
 import type { IsolationMode, ScheduledNote, ScoreView as ViewMode } from "@/lib/music/types";
@@ -34,7 +45,12 @@ const VIEW_KEY = "hh.view.v1";
 
 export function ReaderPage() {
   const [xml, setXml] = useState<string>(SAMPLE_MUSICXML);
-  const [bpm, setBpm] = useState(90);
+  /** `bpm` is the tempo the music runs at; `shownBpm` follows the controls at once (the slider is debounced). */
+  const [bpm, setBpm] = useState(DEFAULT_STUDY_BPM);
+  const [shownBpm, setShownBpm] = useState(DEFAULT_STUDY_BPM);
+  const bpmRef = useRef(DEFAULT_STUDY_BPM);
+  const shownBpmRef = useRef(DEFAULT_STUDY_BPM);
+  const bpmTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isolation, setIsolationState] = useState<IsolationMode>("both");
   const [isPlaying, setIsPlaying] = useState(false);
   const [zoom, setZoom] = useState(1);
@@ -60,6 +76,10 @@ export function ReaderPage() {
   /** Tempo before "Recorrido" step 2 slowed it down. */
   const [slowFrom, setSlowFrom] = useState<number | null>(null);
   const scoreHash = useMemo(() => hashText(xml), [xml]);
+  const writtenTempo = useMemo(() => parseWrittenTempo(xml), [xml]);
+  const scoreBpm = baseTempo(writtenTempo);
+  const scoreHashRef = useRef(scoreHash);
+  scoreHashRef.current = scoreHash;
   const recorrido = useRecorrido(scoreHash);
   const ficha = useFicha(xml, scoreData, bpm, fichaOpen || showChordMarks || recorridoOpen);
   const patternLayer = usePatternLayer(scoreHash, scoreData);
@@ -105,6 +125,14 @@ export function ReaderPage() {
       /* ignore */
     }
     setViewReady(true);
+    try {
+      const start = resolveInitialBpm(loadSavedTempo(localStorage, hashText(xml)), parseWrittenTempo(xml));
+      applyTempoNow(start);
+      setShownBpm(start);
+    } catch {
+      /* ignore */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const setView = (v: ViewMode) => {
@@ -136,17 +164,67 @@ export function ReaderPage() {
     setIsPlaying(false);
   };
 
-  const handleBpmChange = (v: number) => {
-    setBpm(v);
-    if (isPlaying) {
-      setLoopMeasure(null);
-      stop();
-      setIsPlaying(false);
+  /** Make the music run at `v`. If it is playing, it keeps its place in the piece (see requestRetempo). */
+  const applyTempoNow = (v: number) => {
+    const next = clampBpm(v);
+    const prev = bpmRef.current;
+    if (next === prev) return;
+    requestRetempo(prev / next);
+    bpmRef.current = next;
+    setBpm(next);
+  };
+
+  /** Tempo from the controls. The label moves at once and the choice is saved; the slider waits 150 ms before re-timing. */
+  const handleBpmChange = (v: number, source: "slider" | "other" = "other") => {
+    const next = clampBpm(v);
+    shownBpmRef.current = next;
+    setShownBpm(next);
+    try {
+      saveTempo(localStorage, scoreHashRef.current, next);
+    } catch {
+      /* ignore */
+    }
+    if (bpmTimer.current) clearTimeout(bpmTimer.current);
+    bpmTimer.current = null;
+    if (source === "slider") {
+      bpmTimer.current = setTimeout(() => {
+        bpmTimer.current = null;
+        applyTempoNow(next);
+      }, 150);
+    } else {
+      applyTempoNow(next);
     }
   };
 
+  // Keys "-" and "+" / "=" change the tempo, unless she is typing somewhere.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      const dir = e.key === "+" || e.key === "=" ? 1 : e.key === "-" || e.key === "_" ? -1 : 0;
+      if (!dir) return;
+      e.preventDefault();
+      handleBpmChange(stepBpm(shownBpmRef.current, dir), "other");
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleScoreLoaded = (musicXml: string, _filename: string) => {
     handleStop();
+    if (bpmTimer.current) clearTimeout(bpmTimer.current);
+    bpmTimer.current = null;
+    bpmRef.current = -1; // new score: take its tempo without trying to keep a playing position
+    let start = DEFAULT_STUDY_BPM;
+    try {
+      start = resolveInitialBpm(loadSavedTempo(localStorage, hashText(musicXml)), parseWrittenTempo(musicXml));
+    } catch {
+      start = resolveInitialBpm(null, parseWrittenTempo(musicXml));
+    }
+    applyTempoNow(start);
+    setShownBpm(start);
     setXml(musicXml);
     setScoreData(null);
     setHighlight(null);
@@ -164,9 +242,9 @@ export function ReaderPage() {
   };
 
   const slowTempo = () => {
-    const base = slowFrom ?? bpm;
+    const base = slowFrom ?? shownBpmRef.current;
     setSlowFrom(base);
-    handleBpmChange(Math.max(40, Math.round(base * 0.6)));
+    handleBpmChange(Math.round(base * 0.6));
   };
 
   const restoreTempo = () => {
@@ -229,7 +307,9 @@ export function ReaderPage() {
     >
       <TopBar
         isPlaying={isPlaying}
-        bpm={bpm}
+        bpm={shownBpm}
+        scoreBpm={scoreBpm}
+        hasWrittenTempo={writtenTempo !== null}
         isolation={isolation}
         zoom={zoom}
         view={view}
@@ -315,7 +395,7 @@ export function ReaderPage() {
         onOpenChange={setRecorridoOpen}
         recorrido={recorrido}
         keyInfo={ficha.key}
-        bpm={bpm}
+        bpm={shownBpm}
         slowFrom={slowFrom}
         markMode={markMode}
         onMarkModeChange={setMarkMode}

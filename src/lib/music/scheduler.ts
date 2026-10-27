@@ -121,6 +121,74 @@ export async function loadNotes(notes: ScheduledNote[]) {
   await getSampler();
   clearSchedule();
   currentNotes = notes;
+  if (pendingRetempo) await finishRetempo(notes);
+}
+
+/** Measure loop being played by playRange(), in transport seconds (null when playing the whole piece). */
+let activeRange: { start: number; end: number } | null = null;
+
+/** Tempo change in flight: where to continue once the re-timed notes arrive. */
+let pendingRetempo: { sec: number; ratio: number; running: boolean; timer: ReturnType<typeof setTimeout> } | null = null;
+
+/**
+ * The tempo is about to change by `ratio` (= oldBpm / newBpm). If something is playing (or paused
+ * mid-piece), freeze the transport at the same musical position now; loadNotes() then receives
+ * the notes re-timed for the new bpm and carries on from there (see finishRetempo).
+ */
+export function requestRetempo(ratio: number) {
+  if (!Number.isFinite(ratio) || ratio <= 0 || ratio === 1) return;
+  if (pendingRetempo) {
+    // Another change before the first one landed: compose them.
+    pendingRetempo.sec *= ratio;
+    pendingRetempo.ratio *= ratio;
+    return;
+  }
+  const tr = Tone.getTransport();
+  const state = tr.state;
+  if (state === "stopped") return;
+  const running = state === "started";
+  const sec = tr.seconds;
+  if (running) tr.pause();
+  // If the new notes never arrive, do not leave it frozen: re-time what we have.
+  const timer = setTimeout(() => {
+    if (!pendingRetempo) return;
+    void finishRetempo(currentNotes.map((n) => ({ ...n, startSec: n.startSec * pendingRetempo!.ratio, durationSec: n.durationSec * pendingRetempo!.ratio })));
+  }, 1500);
+  pendingRetempo = { sec: sec * ratio, ratio, running, timer };
+}
+
+async function finishRetempo(notes: ScheduledNote[]) {
+  const p = pendingRetempo;
+  if (!p) return;
+  pendingRetempo = null;
+  clearTimeout(p.timer);
+  if (notes !== currentNotes) currentNotes = notes;
+  const tr = Tone.getTransport();
+  if (activeRange) {
+    activeRange = { start: activeRange.start * p.ratio, end: activeRange.end * p.ratio };
+  }
+  if (!p.running) {
+    // Paused: just move the playhead. Reproducir will schedule everything and continue from here.
+    tr.seconds = p.sec;
+    if (activeRange) {
+      tr.setLoopPoints(activeRange.start, activeRange.end);
+      tr.loop = true;
+    }
+    return;
+  }
+  const samp = await getSampler();
+  clearSchedule();
+  tr.stop();
+  if (activeRange) {
+    const { start, end } = activeRange;
+    scheduleNotes(samp, notes.filter((n) => n.startSec >= start - 1e-3 && n.startSec < end - 1e-3));
+    tr.setLoopPoints(start, end);
+    tr.loop = true;
+  } else {
+    tr.loop = false;
+    scheduleNotes(samp, notes);
+  }
+  tr.start(undefined, p.sec);
 }
 
 export function clearSchedule() {
@@ -164,6 +232,7 @@ export async function play() {
   const samp = await getSampler();
   clearSchedule();
   Tone.getTransport().loop = false;
+  activeRange = null;
   scheduleNotes(samp, currentNotes);
   Tone.getTransport().start();
 }
@@ -175,6 +244,7 @@ export async function playRange(startSec: number, endSec: number) {
   clearSchedule();
   const tr = Tone.getTransport();
   tr.stop();
+  activeRange = { start: startSec, end: endSec };
   scheduleNotes(
     samp,
     currentNotes.filter((n) => n.startSec >= startSec - 1e-3 && n.startSec < endSec - 1e-3),
@@ -189,6 +259,11 @@ export function pause() {
 }
 
 export function stop() {
+  activeRange = null;
+  if (pendingRetempo) {
+    clearTimeout(pendingRetempo.timer);
+    pendingRetempo = null;
+  }
   try {
     Tone.getTransport().stop();
     Tone.getTransport().loop = false;

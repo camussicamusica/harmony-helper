@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
+import { TempoControl } from "./TempoControl";
 import { Switch } from "@/components/ui/switch";
 import type { IsolationMode, ScoreView } from "@/lib/music/types";
 import { ColorStudio } from "@/components/studio/ColorStudio";
@@ -16,6 +17,8 @@ import { ChevronDown, Keyboard, Layers, ListMusic, Minus, Pause, Play, Plus, Rou
 interface Props {
   isPlaying: boolean;
   bpm: number;
+  scoreBpm: number;
+  hasWrittenTempo: boolean;
   isolation: IsolationMode;
   zoom: number;
   view: ScoreView;
@@ -30,7 +33,7 @@ interface Props {
   onPlay: () => void;
   onPause: () => void;
   onStop: () => void;
-  onBpmChange: (v: number) => void;
+  onBpmChange: (v: number, source: "slider" | "other") => void;
   onIsolationChange: (m: IsolationMode) => void;
   onZoomChange: (z: number) => void;
   onViewChange: (v: ScoreView) => void;
@@ -50,6 +53,8 @@ interface Props {
 export function TopBar({
   isPlaying,
   bpm,
+  scoreBpm,
+  hasWrittenTempo,
   isolation,
   zoom,
   view,
@@ -128,19 +133,7 @@ export function TopBar({
         </Button>
       </div>
 
-      <div className="flex items-center gap-2">
-        <span className="text-xs text-muted-foreground">Tempo</span>
-        <div className="w-28">
-          <Slider
-            value={[bpm]}
-            min={40}
-            max={180}
-            step={1}
-            onValueChange={(v) => onBpmChange(v[0] ?? bpm)}
-          />
-        </div>
-        <span className="w-10 text-xs tabular-nums text-muted-foreground">{bpm} bpm</span>
-      </div>
+      <TempoControl bpm={bpm} scoreBpm={scoreBpm} hasWrittenTempo={hasWrittenTempo} onChange={onBpmChange} />
 
       <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
         {(["both", "rh", "lh"] as IsolationMode[]).map((m) => {

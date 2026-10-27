@@ -121,11 +121,51 @@ La app recuerda el modo que elegiste la última vez.
 1. "Reproducir": empieza a sonar. Se convierte en "Pausa".
 2. "Pausa": pausa.
 3. "Detener": para y vuelve al principio.
-4. "Tempo": deslizá la barra. Va de 40 a 180 bpm (**bpm** = golpes por minuto; más alto = más rápido). Si cambiás el tempo mientras suena, se detiene. Tocá "Reproducir" de nuevo.
-5. "Dos manos": suenan y se ven las dos manos.
-6. "Mano derecha": solo la mano derecha.
-7. "Mano izquierda": solo la mano izquierda.
-8. "Zoom": barra o botones "−" y "+". Agranda o achica la partitura (de 50% a 250%).
+4. "Dos manos": suenan y se ven las dos manos.
+5. "Mano derecha": solo la mano derecha.
+6. "Mano izquierda": solo la mano izquierda.
+7. "Zoom": barra o botones "−" y "+". Agranda o achica la partitura (de 50% a 250%).
+
+### Tempo (la velocidad)
+
+**bpm** = golpes por minuto; más alto = más rápido. En la barra de arriba, al lado de "Detener", está el grupo "Tempo de la partitura". Va de 20 a 220 bpm.
+
+**Bajar la velocidad**
+
+1. Tocá el botón "−" (aria-label "Bajar tempo"). Baja 5 bpm.
+2. Si querés bajar de a 1 bpm, mantené apretada la tecla Shift y tocá "−".
+3. Para subir, tocá el botón "+" ("Subir tempo"). Sube 5 bpm. Con Shift, sube 1.
+4. Atajo de teclado: la tecla "−" baja 5 y la tecla "+" (o "=") sube 5. No funcionan si estás escribiendo en un cuadro de texto.
+
+**Escribir un número**
+
+1. Tocá el valor "♩ = 72" (el ♩ es la negra; 72 es cuántas negras por minuto).
+2. Escribí el número que quieras, por ejemplo 60.
+3. Apretá Enter. Con Escape cancelás.
+
+**Usar la barra**
+
+1. Arrastrá la barra "Tempo de la partitura". Cuando la soltás (o a los 150 milisegundos de dejar de moverla), el tempo se aplica.
+
+**Los botones 50%, 75% y 100%**
+
+1. Tocá "50%" para tocar a la mitad del tempo de la partitura.
+2. Tocá "75%" para tocar a tres cuartos.
+3. Tocá "100%" para volver al tempo de la partitura.
+4. El botón activo se ve oscuro. Si el tempo no coincide con ninguno, no hay ninguno activo.
+
+**De dónde sale el tempo de la partitura**
+
+1. Si la partitura trae un tempo escrito (por ejemplo ♩ = 66), la app empieza ahí.
+2. Si no trae ninguno, la app empieza en 72 y aparece "(sin tempo escrito)". El 100% es 72.
+3. La app recuerda el tempo que dejaste en cada partitura. Cuando la volvés a abrir, está el tuyo.
+
+**Cambiar el tempo mientras suena**
+
+1. Con la pieza sonando, tocá "−", "+", un porcentaje o escribí un número.
+2. No hace falta apretar "Detener". La música sigue desde el mismo punto de la pieza, más lenta o más rápida.
+3. Si estás repitiendo un compás (Recorrido, paso 6), la repetición sigue con el tempo nuevo.
+4. Si estaba en "Pausa", al tocar "Reproducir" sigue desde donde pausaste, con el tempo nuevo.
 
 Piano de abajo: las teclas se iluminan con el color de la nota que suena. Si apagaste el color de esa nota, se ilumina con el color de la mano.
 
