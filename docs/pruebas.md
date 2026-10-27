@@ -10,16 +10,16 @@ tags: [harmony-helper, pruebas, tests]
 
 Una prueba es una **pregunta guardada con la respuesta que ya sabemos**. Por ejemplo: "¿Fa#-La-Do# se llama Fa# menor?" La respuesta correcta es "sí". La computadora le hace la pregunta al programa, mira lo que contesta y compara. Si coincide, la prueba **pasa** (pass). Si no coincide, **falla** (fail).
 
-Hoy hay 129 preguntas guardadas. Se corren solas en un segundo. Sirven para que, cuando agregamos algo nuevo, no se rompa en silencio algo que ya andaba.
+Hoy hay 190 preguntas guardadas. Se corren solas en un segundo. Sirven para que, cuando agregamos algo nuevo, no se rompa en silencio algo que ya andaba.
 
-Las pruebas viven en la carpeta `tests/` del proyecto. Cubren la lógica musical (tonalidades, acordes, nombres, círculo, teclado MIDI, ejercicios del Recorrido, archivos .mxl y colores). No cubren cómo se ve la pantalla.
+Las pruebas viven en la carpeta `tests/` del proyecto. Cubren la lógica musical (tonalidades, acordes, nombres, círculo, teclado MIDI, ejercicios del Recorrido, archivos .mxl, colores, cajas de patrones y degradé). No cubren cómo se ve la pantalla.
 
 ## Cómo correrlas
 
 1. Abrí la Terminal.
 2. Escribí `cd ~/code/harmony-helper` y apretá Enter. Esto te lleva a la carpeta del proyecto.
 3. Escribí `~/.bun/bin/bun run check` y apretá Enter.
-4. Esperá unos segundos. `check` hace dos cosas seguidas: primero revisa que el código esté bien escrito (tsc) y después corre las 129 preguntas.
+4. Esperá unos segundos. `check` hace dos cosas seguidas: primero revisa que el código esté bien escrito (tsc) y después corre las 190 preguntas.
 5. Mirá las últimas líneas del resultado (ver la sección siguiente).
 
 Si querés correr solo las preguntas, sin la revisión de escritura, usá `~/.bun/bin/bun test` en el paso 3.
@@ -27,10 +27,10 @@ Si querés correr solo las preguntas, sin la revisión de escritura, usá `~/.bu
 ## Qué significa lo que aparece
 
 1. **Todo bien.** Las últimas líneas dicen algo así:
-   - `129 pass`
+   - `190 pass`
    - `0 fail`
 
-   Quiere decir que las 129 respuestas coinciden. Podés seguir tranquila.
+   Quiere decir que las 190 respuestas coinciden. Podés seguir tranquila.
 2. **Algo falló.** Aparece `(fail)` con el nombre de la pregunta, la respuesta esperada (`Expected`) y la que dio el programa (`Received`). Quiere decir que algo que antes andaba dejó de andar. No lo arregles a mano: copiá ese texto y pegáselo a Claude.
 3. **Error de escritura (tsc).** Si antes de las pruebas aparece una lista de errores con nombres de archivo y números de línea, es la revisión de escritura. Las pruebas ni empiezan hasta que eso se arregle.
 4. **`skip` o `todo`.** Una pregunta anotada como pendiente: sabemos de un problema, está explicado en un comentario dentro de la prueba y todavía no se arregló. Hoy no hay ninguna.
@@ -104,6 +104,29 @@ Se instala una sola vez por copia del proyecto:
 | ¿Guardar, duplicar y cambiar de versión de colores solo agrega versiones y nunca borra ninguna? | Sí |
 | ¿Importar una paleta agrega una versión nueva sin pisar las otras, y un archivo inválido no cambia nada? | Sí |
 | ¿Un color propio que "borrás" queda oculto en lugar de destruirse? | Sí |
+| ¿Un compás que aparece dos veces es un patrón con dos apariciones, y uno que aparece una sola vez no es patrón? | Sí |
+| ¿Los silencios cuentan: un compás que arranca con silencio no es igual a uno que arranca con la nota? | Sí |
+| ¿Una nota ligada que solo continúa no cuenta como nota nueva? | Sí |
+| ¿En la pieza de ejemplo, 1=3=5 es un patrón (A) y 2=6 otro (B), y el 4, el 7 y el 8 no tienen caja? | Sí |
+| ¿Un tramo de 2 a 4 compases que se repite se marca como un solo grupo, y el más largo gana? | Sí |
+| ¿Si un compás del tramo también aparece suelto en otro lado, se marcan los compases de a uno? | Sí |
+| ¿"Ambas manos", "Mano derecha" y "Mano izquierda" comparan lo que corresponde? | Sí |
+| ¿"Incluir parecidos" apagado no muestra nada, y prendido muestra el compás transportado con el color y la letra de su patrón (B′)? | Sí |
+| ¿Un compás con otro ritmo, o con otros saltos entre notas, no se toma por transportado? | Sí |
+| ¿Los colores de las cajas son suaves, quedan bien separados en el círculo de colores y dos cajas vecinas nunca tienen tonos parecidos? | Sí |
+| ¿La misma partitura conserva sus colores al recargar y otra partitura saca otros? | Sí |
+| ¿"Otra combinación" cambia los colores solo de esa partitura y mueve el primer tono lejos del anterior? | Sí |
+| ¿"Me gusta esta" guarda la combinación sin repetirla, y nada la borra salvo "Quitar"? | Sí |
+| ¿Las combinaciones del prototipo se importan una sola vez y el original queda intacto? | Sí |
+| ¿Una combinación guardada aplicada a una partitura se conserva, y si faltan colores se completan con otros lejanos? | Sí |
+| ¿Si el almacenamiento falla o tiene basura, no se rompe nada? | Sí |
+| ¿Las dos capas arrancan apagadas y recuerdan lo que elegiste? | Sí |
+| ¿El degradé pone cada color en la posición de la cabeza de su nota, sin importar cuánto dura? | Sí |
+| ¿Un acorde da un solo color (el promedio de sus notas) en su lugar? | Sí |
+| ¿El degradé se corta en los saltos de renglón y en un silencio largo, pero no mientras una nota sigue sonando? | Sí |
+| ¿Una nota con el color apagado no agrega color al degradé? | Sí |
+| ¿Con la intensidad de fábrica (35%) las notas negras se leen con contraste 4,5:1 o más sobre los 12 colores? | Sí |
+| ¿Si un color es muy oscuro, la intensidad se limita sola para que las notas negras se lean? | Sí |
 
 ## Qué no cubren
 

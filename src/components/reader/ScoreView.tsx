@@ -21,6 +21,10 @@ import type { PieceChord } from "@/lib/music/analysis/pieceChords";
 import { getRole } from "@/lib/colors/store";
 import { intervalRole, intervalSignature, noteSignature, noteTargetOn, subscribe as subscribeColors } from "@/lib/colors/store";
 import type { Hand, IsolationMode, ScheduledNote, ScoreView as ViewMode } from "@/lib/music/types";
+import type { Pattern, PatternScope } from "@/lib/music/analysis/patterns";
+import { colorKey } from "@/lib/music/analysis/patterns";
+import { strongOf } from "@/lib/music/analysis/patternColors";
+import { buildBands, gradientStops, maxIntensityForContrast, type DegradeNote } from "@/lib/music/analysis/degrade";
 
 // CJS/ESM-tolerant constructor lookup — OSMD ships as CJS so the named export
 // can be missing in some SSR/Vite paths.
@@ -58,6 +62,29 @@ interface Props {
   highlightMeasure?: number | null;
   /** Scroll the score to this measure (nonce makes repeated requests work). */
   focusMeasure?: { measure: number; nonce: number } | null;
+  /** "Cajas de patrones": boxes behind the notes. null/undefined = layer off. */
+  patternLayer?: PatternLayerView | null;
+  /** "Degradé de notas": soft band behind each staff. null/undefined = layer off. */
+  degradeLayer?: { intensity: number } | null;
+  /** Reports the strongest intensity that keeps black noteheads at 4.5:1 for the current notes. */
+  onDegradeCap?: (cap: number) => void;
+}
+
+export interface PatternLayerView {
+  patterns: Pattern[];
+  /** color key -> box color */
+  colors: Map<string, string>;
+  /** color key -> letter */
+  letters: Map<string, string>;
+  scope: PatternScope;
+  intensity: number;
+}
+
+interface PatternHit {
+  key: string;
+  /** First measure of this occurrence. */
+  first: number;
+  rects: Array<{ x: number; y: number; w: number; h: number }>;
 }
 
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -102,6 +129,9 @@ export function ScoreView({
   onToggleHardMeasure,
   highlightMeasure = null,
   focusMeasure = null,
+  patternLayer = null,
+  degradeLayer = null,
+  onDegradeCap,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -109,6 +139,8 @@ export function ScoreView({
   const overlayRef = useRef<SVGSVGElement | null>(null);
   const chordSvgRef = useRef<SVGSVGElement | null>(null);
   const hardSvgRef = useRef<SVGSVGElement | null>(null);
+  const patternSvgRef = useRef<SVGSVGElement | null>(null);
+  const degradeSvgRef = useRef<SVGSVGElement | null>(null);
   const osmdRef = useRef<any>(null);
   const readyRef = useRef(false);
   const cleanupRef = useRef<Array<() => void>>([]);
@@ -145,6 +177,19 @@ export function ScoreView({
   markModeRef.current = markMode;
   const onToggleHardRef = useRef(onToggleHardMeasure);
   onToggleHardRef.current = onToggleHardMeasure;
+  const patternLayerRef = useRef(patternLayer);
+  patternLayerRef.current = patternLayer;
+  const degradeLayerRef = useRef(degradeLayer);
+  degradeLayerRef.current = degradeLayer;
+  const onDegradeCapRef = useRef(onDegradeCap);
+  onDegradeCapRef.current = onDegradeCap;
+  /** Boxes drawn right now (for hover and click), and the pattern color key under the pointer. */
+  const patternHitsRef = useRef<PatternHit[]>([]);
+  const patternHoverRef = useRef<string | null>(null);
+  /** Top and bottom (px, relative to the wrapper) of every staff, per system id, top staff first. */
+  const staffRowsRef = useRef<Map<number, Array<{ top: number; bottom: number }>>>(new Map());
+  /** Length of one measure in seconds: a silence this long cuts the degradé. */
+  const measureSecRef = useRef(0);
   /** Top staff line (px, relative to the wrapper) of each system id. */
   const systemTopRef = useRef<Map<number, number>>(new Map());
   const fitRef = useRef(1);
@@ -253,21 +298,31 @@ export function ScoreView({
 
     // Top staff line of each system: first group of 5 flat staff-line paths of every system's top staff.
     const tops: number[] = [];
+    const rows: Array<{ top: number; bottom: number }> = [];
     containerRef.current?.querySelectorAll(".staffline").forEach((g) => {
-      const ys = Array.from(g.querySelectorAll("path"))
+      const rs = Array.from(g.querySelectorAll("path"))
         .map((p) => p.getBoundingClientRect())
-        .filter((r) => r.height < 1 && r.width > 0)
-        .map((r) => r.top - wr.top);
-      if (ys.length) tops.push(Math.min(...ys));
+        .filter((r) => r.height < 1 && r.width > 0);
+      if (rs.length) {
+        const top = Math.min(...rs.map((r) => r.top - wr.top));
+        tops.push(top);
+        rows.push({ top, bottom: Math.max(...rs.map((r) => r.bottom - wr.top)) });
+      }
     });
     tops.sort((a, b) => a - b);
+    rows.sort((a, b) => a.top - b.top);
     const sysIds = [...new Set(notes.map((n) => n.system ?? 0))].sort((a, b) => a - b);
     const m = new Map<number, number>();
+    const staffRows = new Map<number, Array<{ top: number; bottom: number }>>();
     if (sysIds.length && tops.length && tops.length % sysIds.length === 0) {
       const per = tops.length / sysIds.length;
-      sysIds.forEach((id, i) => m.set(id, tops[i * per]));
+      sysIds.forEach((id, i) => {
+        m.set(id, tops[i * per]);
+        staffRows.set(id, rows.slice(i * per, (i + 1) * per));
+      });
     }
     systemTopRef.current = m;
+    staffRowsRef.current = staffRows;
   };
 
   /** Where a chord mark sits: x over its first notes, y above the top staff of that system. */
@@ -431,8 +486,249 @@ export function ScoreView({
     }
   };
 
+  /** Which system (line) each measure is on. */
+  const measureSystems = (): Map<number, number> => {
+    const out = new Map<number, number>();
+    for (const n of notesRef.current) if (!out.has(n.measure)) out.set(n.measure, n.system ?? 0);
+    return out;
+  };
+
+  /** Vertical extent (px) of the staves a scope covers in one system, with a little air and room for ledger lines. */
+  const scopeY = (sys: number, scope: PatternScope): { y0: number; y1: number } | null => {
+    const rows = staffRowsRef.current.get(sys) ?? [];
+    const hands: Hand[] = scope === "rh" ? ["RH"] : scope === "lh" ? ["LH"] : ["RH", "LH"];
+    let pick = rows;
+    if (rows.length >= 2) {
+      if (scope === "rh") pick = [rows[0]];
+      else if (scope === "lh") pick = [rows[1]];
+    }
+    let y0 = Infinity;
+    let y1 = -Infinity;
+    for (const r of pick) {
+      y0 = Math.min(y0, r.top - 14);
+      y1 = Math.max(y1, r.bottom + 14);
+    }
+    for (const n of notesRef.current) {
+      if ((n.system ?? 0) !== sys || n.cy === undefined || !hands.includes(n.hand)) continue;
+      y0 = Math.min(y0, n.cy - 14);
+      y1 = Math.max(y1, n.cy + 14);
+    }
+    return Number.isFinite(y0) && Number.isFinite(y1) ? { y0, y1 } : null;
+  };
+
+  /** "Cajas de patrones": soft rounded boxes behind the notes, one color and one letter per pattern. */
+  const drawPatterns = () => {
+    const svg = patternSvgRef.current;
+    const wrap = wrapRef.current;
+    if (!svg || !wrap) return;
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    svg.setAttribute("width", String(wrap.offsetWidth));
+    svg.setAttribute("height", String(wrap.offsetHeight));
+    patternHitsRef.current = [];
+    const layer = patternLayerRef.current;
+    if (!layer || !layer.patterns.length) return;
+    const boxes = measureBoxes();
+    const sysOf = measureSystems();
+    const hover = patternHoverRef.current;
+    for (const p of layer.patterns) {
+      const key = colorKey(p);
+      const base = layer.colors.get(key);
+      if (!base) continue;
+      const strong = strongOf(base);
+      const letter = (layer.letters.get(key) ?? "?") + (p.kind === "transposed" ? "\u2032" : "");
+      const lit = hover === key;
+      const dim = hover !== null && !lit;
+      for (const occ of p.measures) {
+        const segs: Array<{ x0: number; x1: number; y0: number; y1: number }> = [];
+        for (const m of occ) {
+          const b = boxes.get(m);
+          const ys = scopeY(sysOf.get(m) ?? 0, layer.scope);
+          if (!b || !ys) continue;
+          const last = segs[segs.length - 1];
+          if (last && Math.abs(last.y0 - ys.y0) < 1 && b.x0 >= last.x0) last.x1 = Math.max(last.x1, b.x1);
+          else segs.push({ x0: b.x0, x1: b.x1, y0: ys.y0, y1: ys.y1 });
+        }
+        if (!segs.length) continue;
+        const g = svgEl("g", { opacity: dim ? 0.4 : 1 });
+        const rects: PatternHit["rects"] = [];
+        segs.forEach((sg, i) => {
+          const x = sg.x0 + 2;
+          const w = Math.max(10, sg.x1 - sg.x0 - 4);
+          const h = sg.y1 - sg.y0;
+          rects.push({ x, y: sg.y0, w, h });
+          g.appendChild(
+            svgEl("rect", {
+              x,
+              y: sg.y0,
+              width: w,
+              height: h,
+              rx: 9,
+              fill: base,
+              "fill-opacity": lit ? Math.min(0.7, layer.intensity + 0.2) : layer.intensity,
+              stroke: strong,
+              "stroke-opacity": 0.85,
+              "stroke-width": lit ? 2.5 : 1.25,
+              ...(p.kind === "transposed" ? { "stroke-dasharray": "6 4" } : {}),
+            }),
+          );
+          if (i === 0) {
+            const pw = 10 + letter.length * 7;
+            g.appendChild(svgEl("rect", { x: x + 5, y: sg.y0 + 5, width: pw, height: 16, rx: 8, fill: strong }));
+            const t = svgEl("text", {
+              x: x + 5 + pw / 2,
+              y: sg.y0 + 17,
+              "text-anchor": "middle",
+              "font-size": 11,
+              "font-weight": 700,
+              fill: "#ffffff",
+            });
+            t.textContent = letter;
+            g.appendChild(t);
+          }
+        });
+        svg.appendChild(g);
+        patternHitsRef.current.push({ key, first: occ[0], rects });
+      }
+    }
+  };
+
+  /** Color of a note for the degradé, or null when its color is switched off. */
+  const degradeColor = (midi: number): string | null => {
+    const r = getRole(`note-${((midi % 12) + 12) % 12}`);
+    return !r || r.enabled === false ? null : r.color;
+  };
+  const lastCapRef = useRef(-1);
+
+  /** "Degradé de notas": a soft band behind each staff, colors placed at the notehead x. */
+  const drawDegrade = () => {
+    const svg = degradeSvgRef.current;
+    const wrap = wrapRef.current;
+    if (!svg || !wrap) return;
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    svg.setAttribute("width", String(wrap.offsetWidth));
+    svg.setAttribute("height", String(wrap.offsetHeight));
+    const layer = degradeLayerRef.current;
+    if (!layer) return;
+
+    const dnotes: DegradeNote[] = [];
+    const spans = new Map<string, { min: number; max: number }>();
+    for (const n of notesRef.current) {
+      if (n.cx === undefined || n.cy === undefined) continue;
+      const sys = n.system ?? 0;
+      const rows = staffRowsRef.current.get(sys) ?? [];
+      const staff = rows.length >= 2 && n.hand === "LH" ? 1 : 0;
+      dnotes.push({ x: n.cx, staff, system: sys, startSec: n.startSec, endSec: n.startSec + n.durationSec, color: degradeColor(n.midi) });
+      const k = `${sys}:${staff}`;
+      const sp = spans.get(k);
+      if (sp) {
+        sp.min = Math.min(sp.min, n.cy);
+        sp.max = Math.max(sp.max, n.cy);
+      } else spans.set(k, { min: n.cy, max: n.cy });
+    }
+    const measureSec = measureSecRef.current > 0 ? measureSecRef.current : (60 / bpmRef.current) * 4;
+    const bands = buildBands(dnotes, { maxGapSec: measureSec * 0.95 });
+    const cap = maxIntensityForContrast(bands.flatMap((b) => b.stops.map((s) => s.color)));
+    if (Math.abs(cap - lastCapRef.current) > 0.004) {
+      lastCapRef.current = cap;
+      onDegradeCapRef.current?.(cap);
+    }
+    const alpha = Math.min(layer.intensity, cap);
+    const defs = svgEl("defs", {});
+    svg.appendChild(defs);
+    bands.forEach((b, i) => {
+      const row = staffRowsRef.current.get(b.system)?.[b.staff];
+      const sp = spans.get(`${b.system}:${b.staff}`)!;
+      const y0 = Math.min(row ? row.top - 16 : Infinity, sp.min - 22);
+      const y1 = Math.max(row ? row.bottom + 16 : -Infinity, sp.max + 22);
+      const gid = `hhdg-${i}`;
+      const vid = `hhdv-${i}`;
+      const mid = `hhdm-${i}`;
+      const grad = svgEl("linearGradient", { id: gid, gradientUnits: "userSpaceOnUse", x1: b.x0, y1: 0, x2: b.x1, y2: 0 });
+      for (const st of gradientStops(b)) {
+        grad.appendChild(svgEl("stop", { offset: st.offset, "stop-color": st.color, "stop-opacity": st.opacity }));
+      }
+      // Soft top and bottom edges: the band is a ribbon, not a hard rectangle.
+      const vgrad = svgEl("linearGradient", { id: vid, gradientUnits: "userSpaceOnUse", x1: 0, y1: y0, x2: 0, y2: y1 });
+      vgrad.appendChild(svgEl("stop", { offset: 0, "stop-color": "#ffffff", "stop-opacity": 0 }));
+      vgrad.appendChild(svgEl("stop", { offset: 0.28, "stop-color": "#ffffff", "stop-opacity": 1 }));
+      vgrad.appendChild(svgEl("stop", { offset: 0.72, "stop-color": "#ffffff", "stop-opacity": 1 }));
+      vgrad.appendChild(svgEl("stop", { offset: 1, "stop-color": "#ffffff", "stop-opacity": 0 }));
+      const mask = svgEl("mask", { id: mid, maskUnits: "userSpaceOnUse", x: b.x0, y: y0, width: b.x1 - b.x0, height: y1 - y0 });
+      mask.appendChild(svgEl("rect", { x: b.x0, y: y0, width: b.x1 - b.x0, height: y1 - y0, fill: `url(#${vid})` }));
+      defs.append(grad, vgrad, mask);
+      svg.appendChild(
+        svgEl("rect", {
+          x: b.x0,
+          y: y0,
+          width: b.x1 - b.x0,
+          height: y1 - y0,
+          fill: `url(#${gid})`,
+          "fill-opacity": alpha,
+          mask: `url(#${mid})`,
+        }),
+      );
+    });
+  };
+
+  /** Scroll so a box (px, relative to the wrapper) is in view: Tocar moves the band, Estudiar moves the page. */
+  const scrollToBox = (b: { x0: number; y0: number }) => {
+    const sc = scrollRef.current;
+    const wrap = wrapRef.current;
+    if (!sc || !wrap) return;
+    if (viewRef.current === "tocar") {
+      holdUntilRef.current = performance.now() + 2500;
+      sc.scrollTo({ left: Math.max(0, b.x0 - NOW_LINE_FRACTION * sc.clientWidth), behavior: "smooth" });
+    } else {
+      const top = wrap.getBoundingClientRect().top + window.scrollY + b.y0 - 150;
+      window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+    }
+  };
+
+  const patternHitAt = (e: React.MouseEvent<HTMLDivElement>): PatternHit | null => {
+    const wrap = wrapRef.current;
+    if (!wrap || !patternHitsRef.current.length) return null;
+    const wr = wrap.getBoundingClientRect();
+    const x = e.clientX - wr.left;
+    const y = e.clientY - wr.top;
+    for (const h of patternHitsRef.current) {
+      for (const r of h.rects) if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) return h;
+    }
+    return null;
+  };
+
+  /** Pointer over a pattern box: light up every occurrence of that pattern. */
+  const onWrapMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!patternLayerRef.current) return;
+    const key = patternHitAt(e)?.key ?? null;
+    if (key === patternHoverRef.current) return;
+    patternHoverRef.current = key;
+    drawPatterns();
+    if (wrapRef.current) wrapRef.current.style.cursor = key && !markModeRef.current ? "pointer" : "";
+  };
+  const onWrapLeave = () => {
+    if (patternHoverRef.current === null) return;
+    patternHoverRef.current = null;
+    drawPatterns();
+    if (wrapRef.current) wrapRef.current.style.cursor = "";
+  };
+
   /** Click in "Marcar compás difícil" mode: which measure is under the pointer? */
   const onWrapClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!markModeRef.current && patternLayerRef.current) {
+      // Click on a pattern box: go to the next occurrence of that pattern.
+      const hit = patternHitAt(e);
+      const layer = patternLayerRef.current;
+      if (hit && layer) {
+        const firsts = layer.patterns
+          .filter((p) => colorKey(p) === hit.key)
+          .flatMap((p) => p.measures.map((o) => o[0]))
+          .sort((a, b) => a - b);
+        const next = firsts[(firsts.indexOf(hit.first) + 1) % firsts.length];
+        const b = measureBoxes().get(next);
+        if (b && next !== hit.first) scrollToBox(b);
+      }
+      return;
+    }
     if (!markModeRef.current || !onToggleHardRef.current) return;
     const wrap = wrapRef.current;
     if (!wrap) return;
@@ -655,6 +951,8 @@ export function ScoreView({
   /** Re-measure and redraw without re-rendering OSMD. */
   const relayout = () => {
     measure(notesRef.current);
+    drawPatterns();
+    drawDegrade();
     drawLine();
     drawChords();
     drawHard();
@@ -720,12 +1018,16 @@ export function ScoreView({
       }
     }
 
+    drawPatterns();
+    drawDegrade();
     drawLine();
     drawChords();
     drawHard();
     notesOut(notes);
     try {
-      onScoreDataRef.current?.(notes, readScoreMeta(osmd, bpmRef.current));
+      const meta = readScoreMeta(osmd, bpmRef.current);
+      measureSecRef.current = meta.measures[0] ? meta.measures[0].endSec - meta.measures[0].startSec : 0;
+      onScoreDataRef.current?.(notes, meta);
     } catch {
       /* ignore */
     }
@@ -863,6 +1165,7 @@ export function ScoreView({
     const unsub = subscribeColors(() => {
       drawChords(); // chord role colors may have changed
       drawHard();
+      drawDegrade(); // the band follows the note colors
       const sig = noteSignature();
       const intSig = intervalSignature();
       if (intSig !== lastIntSig) {
@@ -902,7 +1205,11 @@ export function ScoreView({
       notesRef.current = notes;
       measure(notes);
       onNotesRef.current(notes);
-      onScoreDataRef.current?.(notes, readScoreMeta(osmd, bpm));
+      const meta = readScoreMeta(osmd, bpm);
+      measureSecRef.current = meta.measures[0] ? meta.measures[0].endSec - meta.measures[0].startSec : 0;
+      onScoreDataRef.current?.(notes, meta);
+      drawPatterns();
+      drawDegrade();
       drawChords();
       drawHard();
     } catch (e) {
@@ -926,6 +1233,17 @@ export function ScoreView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chordMarks, showChordMarks, highlightChords]);
 
+  // Pattern boxes / degradé — redraw when the layer or its settings change.
+  useEffect(() => {
+    patternHoverRef.current = null;
+    if (wrapRef.current) wrapRef.current.style.cursor = "";
+    drawPatterns();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [patternLayer]);
+  useEffect(() => {
+    drawDegrade();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [degradeLayer]);
   // Hard measures / selected measure — redraw the amber boxes.
   useEffect(() => {
     drawHard();
@@ -939,13 +1257,7 @@ export function ScoreView({
     const wrap = wrapRef.current;
     const b = measureBoxes().get(focusMeasure.measure);
     if (!b || !sc || !wrap) return;
-    if (viewRef.current === "tocar") {
-      holdUntilRef.current = performance.now() + 2500;
-      sc.scrollTo({ left: Math.max(0, b.x0 - NOW_LINE_FRACTION * sc.clientWidth), behavior: "smooth" });
-    } else {
-      const top = wrap.getBoundingClientRect().top + window.scrollY + b.y0 - 150;
-      window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
-    }
+    scrollToBox(b);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusMeasure]);
 
@@ -1044,6 +1356,8 @@ export function ScoreView({
         <div
           ref={wrapRef}
           onClick={onWrapClick}
+          onMouseMove={onWrapMove}
+          onMouseLeave={onWrapLeave}
           className={markMode ? "relative cursor-crosshair" : "relative"}
           style={
             tocar
@@ -1059,10 +1373,13 @@ export function ScoreView({
               : { padding: 16 }
           }
         >
+          {/* Behind the notes: pattern boxes first, then the degradé. The score sits above them. */}
+          <svg ref={patternSvgRef} className="pointer-events-none absolute left-0 top-0" aria-hidden />
+          <svg ref={degradeSvgRef} className="pointer-events-none absolute left-0 top-0" aria-hidden />
           <div
             ref={containerRef}
             className="score-root"
-            style={tocar ? { flex: "none", minWidth: 200 } : { width: "100%" }}
+            style={tocar ? { flex: "none", minWidth: 200, position: "relative" } : { width: "100%", position: "relative" }}
           />
           <svg ref={overlayRef} className="pointer-events-none absolute left-0 top-0" />
           <svg ref={chordSvgRef} className="pointer-events-none absolute left-0 top-0" />

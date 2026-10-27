@@ -189,6 +189,41 @@ Dentro de "Capas":
 
 Los colores de los saltos se cambian en "Colores", pestaña "Intervalos".
 
+### Cajas de patrones
+
+**Patrón:** un compás (o 2 a 4 compases seguidos) que se repite igual. La caja lo pinta de fondo; todas las repeticiones del mismo patrón llevan el mismo color y la misma letra.
+
+1. Tocá "Capas" para abrir la fila.
+2. Prendé el interruptor "Cajas de patrones". Empieza apagado.
+3. Aparece una caja de color detrás de cada compás repetido, con una letra ("A", "B", "C") arriba a la izquierda.
+4. Si no hay compases repetidos, aparece el aviso "Esta partitura no tiene compases que se repitan." (La pieza de ejemplo no tiene repeticiones.)
+5. Pasá el mouse por una caja: se resaltan todas las repeticiones de ese patrón y las demás se apagan un poco.
+6. Hacé clic en una caja: la partitura va a la siguiente repetición de ese patrón.
+7. Los colores se eligen al azar la primera vez que ves una partitura y se guardan: al recargar, esa partitura tiene los mismos colores. Otra partitura saca otros.
+8. Con "Marcar compás difícil" prendido (Recorrido, paso 5), el clic marca el compás; no salta.
+
+Para cambiar algo, tocá "Ajustes de las cajas":
+1. "Alcance": "Ambas manos" (por defecto), "Mano derecha" o "Mano izquierda". La caja cubre solo los pentagramas elegidos.
+2. "Incluir parecidos (transportados)": apagado por defecto. Prendido, un compás con el mismo ritmo y los mismos saltos pero en otra altura lleva borde de rayitas y la letra con comilla (por ejemplo "B′"), con el color de su patrón.
+3. "Intensidad": qué tan fuerte es el color de fondo. Empieza en 25%.
+4. "Otra combinación": saca colores nuevos al azar para esta partitura.
+5. "Me gusta esta": guarda estos colores. Dice "Guardada." o "Ya la tenías guardada."
+6. "Usar una combinación guardada": tocá "Usar" al lado de la que quieras. Se aplica a esta partitura.
+7. "Quitar": pide confirmación ("¿Quitar esta combinación guardada?"); tocá "Quitar" para confirmar o "Cancelar". Es lo único que borra una combinación guardada.
+8. Las combinaciones que guardaste en el prototipo (`mezcla-de-colores.html`) aparecen solas, una sola vez.
+
+Partitura de prueba: `public/prototipos/patrones-ejemplo.musicxml`. En la barra, tocá "Abrir partitura" y elegila (en tu Mac, dentro de la carpeta del proyecto: `public/prototipos`). Tiene 8 compases: 1, 3 y 5 iguales; 2 y 6 iguales; el 7 es el 2 subido una quinta.
+
+### Degradé de notas
+
+1. En la fila "Capas", prendé "Degradé de notas". Empieza apagado.
+2. Detrás de cada pentagrama aparece una franja suave. Sus colores están justo debajo de cada nota y se mezclan de una nota a la siguiente. Arriba van las notas de la mano derecha; abajo, las de la izquierda.
+3. Un acorde da un solo color: el promedio de sus notas.
+4. La franja se corta en los saltos de renglón y en los silencios largos (un compás entero), y se desvanece en los bordes.
+5. Una nota con el color apagado en "Colores" no pone color en la franja.
+6. "Intensidad": empieza en 35%. Si un color es muy oscuro, la app baja sola la intensidad y avisa "Se muestra al X% para que las notas negras se lean bien."
+7. Se puede usar junto con las cajas de patrones, la línea melódica y los acordes. Cada capa se apaga sola con su interruptor.
+
 ---
 
 ## 7. Hover
@@ -432,7 +467,7 @@ Los pasos 4 (oído interno), 8 (improvisar), 9 (sacar un motivo), 10 (componer) 
 3. **Análisis que se despliega al hacer clic:** idea guardada. No está hecho.
 4. **Leer PDF:** no existe (sección 2). La app te lo dice.
 5. **Esperar tu nota (modo "esperar"), repetir un tramo cualquiera y velocidades 50/75/100%:** no existen (sección 9). El teclado MIDI ya se conecta y se ve. Lo único que se repite es un compás marcado como difícil (paso 6 del Recorrido).
-6. **Buscador de patrones** (motivos que se repiten): estaba en el plan inicial. No lo encontré en la pantalla. Solo existen los colores "Patterns" en el estudio, sin uso visible.
+6. **Buscador de patrones:** ahora existe como "Cajas de patrones" (sección 6). Solo compara compases enteros; no busca motivos más cortos que un compás.
 7. **Biblioteca de partituras guardadas:** estaba en el plan inicial. No existe. Cada vez que abrís la app, vuelve a aparecer la pieza de ejemplo.
 8. **Saltar a un compás durante la reproducción:** no existe. En "Tocar", la partitura solo se mueve sola.
 9. **Herramientas del Recorrido que faltan** (el Recorrido ya existe; estos pasos todavía se hacen a mano):

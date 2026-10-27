@@ -14,6 +14,7 @@ import {
   type ChordHighlight,
   type ScoreData,
 } from "@/lib/music/analysis/useFicha";
+import { useDegradeLayer, usePatternLayer } from "@/lib/music/analysis/usePatternLayer";
 import type { ScoreMeta } from "@/lib/music/analysis/scoreMeta";
 import { SAMPLE_MUSICXML } from "@/lib/music/sampleScore";
 import {
@@ -61,6 +62,26 @@ export function ReaderPage() {
   const scoreHash = useMemo(() => hashText(xml), [xml]);
   const recorrido = useRecorrido(scoreHash);
   const ficha = useFicha(xml, scoreData, bpm, fichaOpen || showChordMarks || recorridoOpen);
+  const patternLayer = usePatternLayer(scoreHash, scoreData);
+  const degradeLayer = useDegradeLayer();
+  const [degradeCap, setDegradeCap] = useState(1);
+  const patternView = useMemo(
+    () =>
+      patternLayer.options.on && patternLayer.patterns.length && patternLayer.colors.size
+        ? {
+            patterns: patternLayer.patterns,
+            colors: patternLayer.colors,
+            letters: patternLayer.letters,
+            scope: patternLayer.options.scope,
+            intensity: patternLayer.options.intensity,
+          }
+        : null,
+    [patternLayer.options.on, patternLayer.options.scope, patternLayer.options.intensity, patternLayer.patterns, patternLayer.colors, patternLayer.letters],
+  );
+  const degradeView = useMemo(
+    () => (degradeLayer.options.on ? { intensity: degradeLayer.options.intensity } : null),
+    [degradeLayer.options.on, degradeLayer.options.intensity],
+  );
   const highlightIdx = useMemo(() => highlightedIndices(highlight, ficha.chords), [highlight, ficha.chords]);
 
   const handleScoreData = useCallback((notes: ScheduledNote[], meta: ScoreMeta) => {
@@ -232,6 +253,10 @@ export function ReaderPage() {
         onLineModeChange={setLineMode}
         onShowKeyboardChange={setShowKeyboard}
         onScoreLoaded={handleScoreLoaded}
+        patternLayer={patternLayer}
+        degradeLayer={degradeLayer}
+        degradeCap={degradeCap}
+        scoreReady={scoreData !== null}
       />
       <main className={`flex flex-1 flex-col ${tocar ? "min-h-0" : ""}`}>
         <section className={`flex-1 ${tocar ? "min-h-0 border-b border-border" : ""}`}>
@@ -258,6 +283,9 @@ export function ReaderPage() {
               onToggleHardMeasure={recorrido.toggleHard}
               highlightMeasure={selectedMeasure !== null && recorrido.progress.hard.includes(selectedMeasure) ? selectedMeasure : null}
               focusMeasure={focusMeasure}
+              patternLayer={patternView}
+              degradeLayer={degradeView}
+              onDegradeCap={setDegradeCap}
             />
           )}
         </section>
