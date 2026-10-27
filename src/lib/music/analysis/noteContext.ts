@@ -231,20 +231,36 @@ export function melodicIntervalEs(from: ScheduledNote, to: ScheduledNote): strin
   return `${Math.abs(i.num)}.ª ${q}`;
 }
 
+/** Without voice information, a step larger than an octave is almost surely a jump between lines: show nothing. */
+const MAX_STEP = 12;
+
+/**
+ * Previous (dir -1) / next (dir 1) note of the same melodic line: same hand (staff) and, when the score says, the same
+ * voice; never the other hand. In the nearest earlier/later figure, a top note follows the top note and any other
+ * note follows the nearest pitch. Null when there is none or the step is bigger than an octave.
+ */
 function neighbour(note: ScheduledNote, all: ScheduledNote[], dir: -1 | 1): ScheduledNote | null {
-  let best: ScheduledNote | null = null;
+  const sameLine = (n: ScheduledNote) =>
+    n.id !== note.id &&
+    n.hand === note.hand &&
+    (note.voice === undefined || n.voice === undefined || n.voice === note.voice) &&
+    !n.tieContinuation;
+  let bestDt = Infinity;
   for (const n of all) {
-    if (n.id === note.id || n.hand !== note.hand || n.tieContinuation) continue;
+    if (!sameLine(n)) continue;
     const dt = (n.startSec - note.startSec) * dir;
-    if (dt <= EPS) continue;
-    if (!best) {
-      best = n;
-      continue;
-    }
-    const bt = (best.startSec - note.startSec) * dir;
-    if (dt < bt - EPS || (Math.abs(dt - bt) <= EPS && Math.abs(n.midi - note.midi) < Math.abs(best.midi - note.midi))) best = n;
+    if (dt > EPS && dt < bestDt) bestDt = dt;
   }
-  return best;
+  if (!Number.isFinite(bestDt)) return null;
+  const figure = all.filter((n) => sameLine(n) && Math.abs((n.startSec - note.startSec) * dir - bestDt) <= EPS);
+  const own = all.filter((n) => n.hand === note.hand && (note.voice === undefined || n.voice === undefined || n.voice === note.voice) && Math.abs(n.startSec - note.startSec) <= EPS);
+  const isTop = own.every((n) => n.midi <= note.midi);
+  const pick = isTop
+    ? figure.reduce((a, b) => (b.midi > a.midi ? b : a))
+    : figure.reduce((a, b) => (Math.abs(b.midi - note.midi) < Math.abs(a.midi - note.midi) ? b : a));
+  // Known to be one voice: a big leap is a real leap. Unknown voices: a leap over an octave is probably another line.
+  const ambiguous = note.voice === undefined || pick.voice === undefined;
+  return ambiguous && Math.abs(pick.midi - note.midi) > MAX_STEP ? null : pick;
 }
 
 function stepOf(note: ScheduledNote, other: ScheduledNote, dir: -1 | 1): MelodyStep | null {

@@ -172,6 +172,7 @@ export function parseSheetToNotes(osmd: OpenSheetMusicDisplay, bpm = 90): ParseR
               slurEnd,
               tieContinuation,
               system: gMeasure.ParentStaffLine?.ParentMusicSystem?.Id ?? 0,
+              voice: src.ParentVoiceEntry?.ParentVoice?.VoiceId,
               svgEls,
               accidentalEls,
             });

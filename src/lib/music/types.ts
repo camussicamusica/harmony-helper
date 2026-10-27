@@ -21,6 +21,8 @@ export interface ScheduledNote {
   tieContinuation?: boolean;
   /** Index of the music system (line of the page) the note sits on. */
   system?: number;
+  /** OSMD voice id inside its staff (the bass line and the chord of one hand are different voices). */
+  voice?: number;
   /** True when a rest (silence) precedes this note in its hand's melodic line. Set by markPhrases. */
   isRestBefore?: boolean;
   /** Notehead center in px, relative to the score wrapper. Set after render. */

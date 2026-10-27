@@ -130,6 +130,7 @@ describe("melody", () => {
     const a = note(60, "C", 0);
     const b = note(60, "C", 0.5);
     const hi = note(84, "C", 1);
+    for (const x of [a, b, hi]) x.voice = 1; // same known voice: a two-octave leap is a real leap
     const all = [a, b, hi];
     expect(noteContext(a, all, null, []).melody.prev).toBeNull();
     expect(noteContext(b, all, null, []).melody.prev?.text).toBe("viene de Do (C): repite la misma nota");
@@ -149,5 +150,33 @@ describe("pitch", () => {
     const d = note(62, "D", 0);
     expect(noteContext(d, [d], null, []).pitch.octaveLabel).toBe("Re4");
     expect(noteContext(d, [d], null, []).keyRole).toBeNull();
+  });
+});
+
+describe("melody neighbours stay in their own line", () => {
+  // Gymnopédie m1-2, left hand: bass G2 (voice 6) and chord B3 D4 F#4 (voice 5), then bass D2 and chord A3 C#4 F#4.
+  const mk = (midi: number, s: string, t: number, voice?: number, hand: Hand = "LH"): ScheduledNote => ({
+    ...note(midi, s, t, 1, hand), voice,
+  });
+  const g2 = mk(43, "G", 0, 6), b3 = mk(59, "B", 0.5, 5), d4 = mk(62, "D", 0.5, 5), fs4 = mk(66, "F#", 0.5, 5);
+  const d2 = mk(38, "D", 2, 6), a3 = mk(57, "A", 2.5, 5), cs4 = mk(61, "C#", 2.5, 5), fs4b = mk(66, "F#", 2.5, 5);
+  const all = [g2, b3, d4, fs4, d2, a3, cs4, fs4b];
+  const dMajor = keyInfo("D", "major");
+
+  test("the top of a chord does not step to the bass line", () => {
+    const ctx = noteContext(fs4, all, dMajor, []);
+    expect(ctx.melody.prev).toBeNull(); // G2 is the bass voice, 3 octaves away
+    expect(ctx.melody.next?.direction).toBe("igual"); // top of the next chord: F#4
+    expect(ctx.melody.next?.text).toContain("Fa# (F#)");
+  });
+  test("without voice info, a jump bigger than an octave is left out", () => {
+    const bare = all.map((x) => ({ ...x, voice: undefined }));
+    const ctx = noteContext(bare.find((x) => x.id === fs4.id)!, bare, dMajor, []);
+    expect(ctx.melody.prev).toBeNull();
+  });
+  test("never crosses to the other hand", () => {
+    const rh = mk(66, "F#", 1.5, 1, "RH");
+    expect(noteContext(fs4, [...all, rh], dMajor, []).melody.next?.text).not.toContain("compás");
+    expect(noteContext(rh, [...all, rh], dMajor, []).melody.prev).toBeNull();
   });
 });

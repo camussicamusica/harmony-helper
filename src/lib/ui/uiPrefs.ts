@@ -6,9 +6,11 @@ export const UI_KEY = "hh.ui.v1";
 export interface UiPrefs {
   menuOpen: boolean;
   pianoOpen: boolean;
+  /** Hover panel: the "Más" part (armonía, suenan ahora, melodía) is open. */
+  tipMore: boolean;
 }
 
-const DEFAULTS: UiPrefs = { menuOpen: true, pianoOpen: true };
+const DEFAULTS: UiPrefs = { menuOpen: true, pianoOpen: true, tipMore: false };
 
 export function parseUiPrefs(raw: string | null): UiPrefs {
   if (!raw) return DEFAULTS;
@@ -17,9 +19,31 @@ export function parseUiPrefs(raw: string | null): UiPrefs {
     return {
       menuOpen: typeof o?.menuOpen === "boolean" ? o.menuOpen : DEFAULTS.menuOpen,
       pianoOpen: typeof o?.pianoOpen === "boolean" ? o.pianoOpen : DEFAULTS.pianoOpen,
+      tipMore: typeof o?.tipMore === "boolean" ? o.tipMore : DEFAULTS.tipMore,
     };
   } catch {
     return DEFAULTS;
+  }
+}
+
+/** Merge `patch` into whatever is stored now (so independent readers never overwrite each other's fields). */
+export function mergeUiPrefs(raw: string | null, patch: Partial<UiPrefs>): UiPrefs {
+  return { ...parseUiPrefs(raw), ...patch };
+}
+
+/** Read / write one field straight from localStorage (for components that do not use the hook). */
+export function readTipMore(): boolean {
+  try {
+    return parseUiPrefs(localStorage.getItem(UI_KEY)).tipMore;
+  } catch {
+    return false;
+  }
+}
+export function writeTipMore(open: boolean) {
+  try {
+    localStorage.setItem(UI_KEY, JSON.stringify(mergeUiPrefs(localStorage.getItem(UI_KEY), { tipMore: open })));
+  } catch {
+    /* ignore */
   }
 }
 
@@ -45,7 +69,12 @@ export function useUiPrefs() {
   }, []);
 
   const update = useCallback((patch: Partial<UiPrefs>) => {
-    const next = { ...ref.current, ...patch };
+    let next = { ...ref.current, ...patch };
+    try {
+      next = mergeUiPrefs(localStorage.getItem(UI_KEY), patch);
+    } catch {
+      /* ignore */
+    }
     ref.current = next;
     setPrefs(next);
     try {

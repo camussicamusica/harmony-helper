@@ -25,6 +25,7 @@ import { headHoverStyle, spelledPc } from "@/lib/colors/noteChip";
 import { buildNoteHitIndex, nearestNoteHit, type HeadBox, type NoteHitIndex } from "@/lib/music/noteHit";
 import { bandScrollTop } from "@/lib/music/scrollMath";
 import { clientToSvg, closeupBox } from "@/lib/music/closeup";
+import { readTipMore, writeTipMore } from "@/lib/ui/uiPrefs";
 import { ChordNoteChips } from "@/components/analysis/ChordNoteChips";
 import { intervalRole, intervalSignature, noteSignature, noteTargetOn, subscribe as subscribeColors } from "@/lib/colors/store";
 import type { Hand, IsolationMode, ScheduledNote, ScoreView as ViewMode } from "@/lib/music/types";
@@ -237,7 +238,9 @@ export function ScoreView({
   const [panelCtx, setPanelCtx] = useState<NoteContext | null>(null);
   /** Cropped, enlarged copy of the printed score around the hovered note (the "photo" at the top of the panel). */
   const [panelCloseup, setPanelCloseup] = useState<SVGSVGElement | null>(null);
-  const [panelPos, setPanelPos] = useState<{ side: "left" | "right"; shiftY: number }>({ side: "right", shiftY: 0 });
+  const [panelPos, setPanelPos] = useState<{ side: "left" | "right"; shiftY: number; maxH: number }>({ side: "right", shiftY: 0, maxH: 600 });
+  /** "Más": armonía, suenan ahora and melodía are open (remembered in hh.ui.v1). */
+  const [tipMore, setTipMore] = useState(false);
   const tipRootRef = useRef<HTMLDivElement | null>(null);
   const tipTagRef = useRef<HTMLButtonElement | null>(null);
   const tipPanelRef = useRef<HTMLDivElement | null>(null);
@@ -572,6 +575,7 @@ export function ScoreView({
     const live = notesRef.current.find((n) => n.id === cur.note.id) ?? cur.note;
     setPanelCtx(noteContext(live, notesRef.current, key, chords));
     setPanelCloseup(buildCloseup(live));
+    setTipMore(readTipMore());
     setPanelOpen(true);
   };
 
@@ -1461,13 +1465,22 @@ export function ScoreView({
     const w = TIP_PANEL_W + 6;
     const wantLeft = tooltip?.tag.left ?? false;
     const side: "left" | "right" = wantLeft || tr.right + w + 8 > window.innerWidth ? "left" : "right";
-    const h = panel.getBoundingClientRect().height;
     const margin = 8;
-    let top = tr.top;
-    if (top + h > window.innerHeight - margin) top = window.innerHeight - margin - h;
-    if (top < margin) top = margin;
-    const shiftY = Math.round(top - tr.top);
-    setPanelPos((p) => (p.side === side && Math.abs(p.shiftY - shiftY) < 1 ? p : { side, shiftY }));
+    const pr = panel.getBoundingClientRect();
+    // The close-up photo sits on the same horizontal line as the tag: its centre follows the tag's centre.
+    const photo = panel.querySelector("[data-testid=tip-closeup]");
+    let shiftY: number;
+    if (photo) {
+      const ph = photo.getBoundingClientRect();
+      shiftY = Math.round(panelPos.shiftY + (tr.top + tr.height / 2 - (ph.top + ph.height / 2)));
+    } else {
+      shiftY = Math.round(Math.min(Math.max(tr.top, margin), window.innerHeight - margin - pr.height) - tr.top);
+    }
+    // Never above the viewport; the photo stays put and only the lower part scrolls inside the panel.
+    const top0 = tr.top + shiftY;
+    if (top0 < margin) shiftY += Math.round(margin - top0);
+    const maxH = Math.max(160, Math.round(window.innerHeight - margin - (tr.top + shiftY)));
+    setPanelPos((p) => (p.side === side && Math.abs(p.shiftY - shiftY) < 1 && Math.abs(p.maxH - maxH) < 2 ? p : { side, shiftY, maxH }));
   });
 
   // Pinned panel: Esc or a click anywhere else closes it.
@@ -1834,10 +1847,20 @@ export function ScoreView({
               data-side={panelPos.side}
             >
               <div
-                className="tip-panel-card max-h-[calc(100vh-16px)] overflow-y-auto rounded-md border border-border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md"
+                className="tip-panel-card flex flex-col rounded-md border border-border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md"
+                style={{ maxHeight: panelPos.maxH }}
                 data-side={panelPos.side}
               >
-                <NotePanel tooltip={tooltip} ctx={panelCtx} closeup={panelCloseup} />
+                <NotePanel
+                  tooltip={tooltip}
+                  ctx={panelCtx}
+                  closeup={panelCloseup}
+                  more={tipMore}
+                  onMore={(v) => {
+                    setTipMore(v);
+                    writeTipMore(v);
+                  }}
+                />
               </div>
             </div>
           )}
@@ -1892,97 +1915,132 @@ function Closeup({ svg }: { svg: SVGSVGElement }) {
   return (
     <div
       ref={ref}
-      className="score-root mx-auto overflow-hidden rounded border border-border bg-white"
+      className="score-root mx-auto mb-1 overflow-hidden rounded border border-border bg-white"
       style={{ width: svg.getAttribute("width") + "px", height: svg.getAttribute("height") + "px", maxWidth: "100%" }}
       data-testid="tip-closeup"
     />
   );
 }
 
-/** Contents of the panel that unfolds from the note's tag. */
-function NotePanel({ tooltip, ctx, closeup }: { tooltip: TooltipState; ctx: NoteContext; closeup: SVGSVGElement | null }) {
+/** A collapsible block of the "Más" part: small-caps title, same look as PanelSection. */
+function MoreSection({ title, open, testId, children }: { title: string; open: boolean; testId: string; children: React.ReactNode }) {
+  return (
+    <details className="mt-2 first:mt-0" open={open} data-testid={testId}>
+      <summary className="mb-0.5 cursor-pointer text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{title}</summary>
+      {children}
+    </details>
+  );
+}
+
+/**
+ * Contents of the panel that unfolds from the note's tag. Top (never scrolls, sits beside the tag): the close-up photo
+ * and the NOTA line. Then figure and key. Everything else is behind "Más".
+ */
+function NotePanel({
+  tooltip,
+  ctx,
+  closeup,
+  more,
+  onMore,
+}: {
+  tooltip: TooltipState;
+  ctx: NoteContext;
+  closeup: SVGSVGElement | null;
+  more: boolean;
+  onMore: (open: boolean) => void;
+}) {
   const { keyRole, chord, melody, figure, moment } = ctx;
   return (
-    <div>
-      {closeup && (
-        <PanelSection title="En la partitura" testId="tip-closeup-section">
-          <Closeup svg={closeup} />
-        </PanelSection>
-      )}
-
-      <PanelSection title="Nota" testId="tip-note">
-        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-          <ChordNoteChips spelled={[tooltip.own.spelled]} size="lg" />
-          <span className="text-sm font-medium" data-testid="tip-octave">{ctx.pitch.octaveLabel}</span>
-        </div>
-        <div className="mt-0.5 text-[11px]">
-          {tooltip.own.duration} · compás {tooltip.measure}
-          {tooltip.beat ? ` · tiempo ${tooltip.beat}` : ""}
-        </div>
-      </PanelSection>
-
-      <PanelSection title="Su figura" testId="tip-figure">
-        {figure.alone ? (
-          <div className="text-[11px] text-muted-foreground">Nota sola (sin otras notas en su figura)</div>
-        ) : (
-          <div>
-            <ChordNoteChips spelled={figure.tones} ownIndex={figure.ownIndex} />
-            {(figure.chord || figure.interval) && <div className="mt-1 text-[11px] font-medium">{figure.chord ?? figure.interval}</div>}
+    <>
+      <div className="shrink-0">
+        {closeup && <Closeup svg={closeup} />}
+        <PanelSection title="Nota" testId="tip-note">
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+            <ChordNoteChips spelled={[tooltip.own.spelled]} size="lg" />
+            <span className="text-sm font-medium" data-testid="tip-octave">{ctx.pitch.octaveLabel}</span>
           </div>
-        )}
-      </PanelSection>
-
-      {keyRole && (
-        <PanelSection title="En la tonalidad" testId="tip-key">
-          <div className="text-[11px] font-medium">{keyRole.text}</div>
-        </PanelSection>
-      )}
-
-      <PanelSection title="En el acorde (la armonía de ese momento)" testId="tip-chord">
-        {chord ? (
-          <div>
-            <div className="text-[11px] font-medium">{chord.name}</div>
-            <ChordNoteChips className="mt-0.5" spelled={chord.tones} ownIndex={chord.ownIndex} />
-            <div className="mt-0.5 text-[11px]">
-              Esta nota es: <span className="font-medium">{chord.roleLabel}</span>
-            </div>
-            <div className="text-[11px]" data-testid="tip-chord-degree">
-              {chord.degreeText ?? (chord.inKey === false ? "acorde fuera de la tonalidad" : null)}
-            </div>
+          <div className="mt-0.5 text-[11px]">
+            {tooltip.own.duration} · compás {tooltip.measure}
+            {tooltip.beat ? ` · tiempo ${tooltip.beat}` : ""}
           </div>
-        ) : (
-          <div className="text-[11px] text-muted-foreground">Sin un acorde claro en este momento.</div>
-        )}
-      </PanelSection>
+        </PanelSection>
+      </div>
 
-      {moment.differsFromFigure && (
-        <details className="mt-2" data-testid="tip-moment">
-          <summary className="mb-0.5 cursor-pointer text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            En este momento suenan (las dos manos)
-          </summary>
-          {/* Small measure: barlines left and right, measure number top-left. */}
-          <div
-            className="relative rounded-md border-x-2 border-y border-y-border border-x-foreground/80 px-2.5 pb-1.5 pt-4"
-            data-testid="tip-measure"
-          >
-            <span className="absolute left-1.5 top-0.5 text-[10px] leading-3 text-muted-foreground">compás {tooltip.measure}</span>
-            <ChordNoteChips spelled={moment.tones} ownIndex={moment.ownIndex} />
-            {moment.held.some(Boolean) && (
-              <div className="mt-1 text-[10px] text-muted-foreground">
-                sostenida{moment.held.filter(Boolean).length > 1 ? "s" : ""}: {moment.tones.filter((_, i) => moment.held[i]).map((t) => solfegeName(t)).join(", ")}
-              </div>
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <PanelSection title="Su figura" testId="tip-figure">
+          {figure.alone ? (
+            <div className="text-[11px] text-muted-foreground">Nota sola (sin otras notas en su figura)</div>
+          ) : (
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <ChordNoteChips spelled={figure.tones} ownIndex={figure.ownIndex} />
+              {(figure.chord || figure.interval) && <span className="text-[11px] font-medium">{figure.chord ?? figure.interval}</span>}
+            </div>
+          )}
+        </PanelSection>
+
+        {keyRole && (
+          <PanelSection title="En la tonalidad" testId="tip-key">
+            <div className="text-[11px] font-medium">{keyRole.text}</div>
+          </PanelSection>
+        )}
+
+        <button
+          type="button"
+          onClick={() => onMore(!more)}
+          aria-expanded={more}
+          data-testid="tip-more"
+          className="mt-2 rounded px-1 text-[11px] font-semibold text-muted-foreground hover:bg-accent hover:text-foreground"
+        >
+          Más {more ? "▾" : "▸"}
+        </button>
+
+        {more && (
+          <div data-testid="tip-more-body">
+            <MoreSection title="Armonía" open testId="tip-chord">
+              {chord ? (
+                <div>
+                  <div className="text-[11px] font-medium">{chord.name}</div>
+                  <ChordNoteChips className="mt-0.5" spelled={chord.tones} ownIndex={chord.ownIndex} />
+                  <div className="mt-0.5 text-[11px]">
+                    Esta nota es: <span className="font-medium">{chord.roleLabel}</span>
+                  </div>
+                  <div className="text-[11px]" data-testid="tip-chord-degree">
+                    {chord.degreeText ?? (chord.inKey === false ? "acorde fuera de la tonalidad" : null)}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-[11px] text-muted-foreground">Sin un acorde claro en este momento.</div>
+              )}
+            </MoreSection>
+
+            {moment.differsFromFigure && (
+              <MoreSection title="Suenan ahora" open={false} testId="tip-moment">
+                {/* Small measure: barlines left and right, measure number top-left. */}
+                <div
+                  className="relative rounded-md border-x-2 border-y border-y-border border-x-foreground/80 px-2.5 pb-1.5 pt-4"
+                  data-testid="tip-measure"
+                >
+                  <span className="absolute left-1.5 top-0.5 text-[10px] leading-3 text-muted-foreground">compás {tooltip.measure}</span>
+                  <ChordNoteChips spelled={moment.tones} ownIndex={moment.ownIndex} />
+                  {moment.held.some(Boolean) && (
+                    <div className="mt-1 text-[10px] text-muted-foreground">
+                      sostenida{moment.held.filter(Boolean).length > 1 ? "s" : ""}: {moment.tones.filter((_, i) => moment.held[i]).map((t) => solfegeName(t)).join(", ")}
+                    </div>
+                  )}
+                  {(moment.name || moment.interval) && <div className="mt-1 text-[11px] font-medium">{moment.name ?? moment.interval}</div>}
+                </div>
+              </MoreSection>
             )}
-            {(moment.name || moment.interval) && <div className="mt-1 text-[11px] font-medium">{moment.name ?? moment.interval}</div>}
-          </div>
-        </details>
-      )}
 
-      {(melody.prev || melody.next) && (
-        <PanelSection title="Melodía" testId="tip-melody">
-          {melody.prev && <div className="text-[11px]">{melody.prev.text}</div>}
-          {melody.next && <div className="text-[11px]">{melody.next.text}</div>}
-        </PanelSection>
-      )}
-    </div>
+            {(melody.prev || melody.next) && (
+              <MoreSection title="Melodía" open testId="tip-melody">
+                {melody.prev && <div className="text-[11px]">{melody.prev.text}</div>}
+                {melody.next && <div className="text-[11px]">{melody.next.text}</div>}
+              </MoreSection>
+            )}
+          </div>
+        )}
+      </div>
+    </>
   );
 }
