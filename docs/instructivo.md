@@ -325,7 +325,7 @@ Partitura de prueba: `public/prototipos/patrones-ejemplo.musicxml`. En la barra,
 
 **Hover:** poner el mouse encima de algo, sin hacer clic.
 
-1. Poné el mouse sobre una nota. Aparece un cartelito. Arriba, una cajita grande con la nota (por ejemplo "Sol (G)") y al lado la duración ("corchea", "blanca con puntillo") y el tiempo.
+1. Poné el mouse sobre una nota, o cerca de ella: cada nota tiene una zona invisible a su alrededor (un poco más ancha que la cabeza, y como dos espacios del pentagrama hacia arriba y hacia abajo). Si el mouse está dentro de esa zona, la nota se enciende y aparece un cartelito al lado de la nota. En un acorde, la nota que se enciende es la que está más cerca del mouse en altura. Si el mouse está lejos de todas las notas, no pasa nada. Arriba, una cajita grande con la nota (por ejemplo "Sol (G)") y al lado la duración ("corchea", "blanca con puntillo") y el tiempo.
 2. Debajo hay un compás chiquito, con barras a los costados y el número de compás arriba a la izquierda. Adentro, una cajita por cada nota que suena junta (las dos manos), con la tuya marcada con borde grueso. Abajo, el nombre del acorde o, si son dos notas, el intervalo ("quinta justa"). Si la app no está segura del acorde, no lo adivina.
 3. Con la línea melódica prendida: poné el mouse sobre un tramo de la línea. Aparece la etiqueta del salto (por ejemplo "5ª J").
 4. La cabeza de la nota (la parte redonda) se enciende con su color de "Colores de las notas", aunque ese color esté apagado. Solo se enciende esa nota, no el resto del acorde ni la plica.

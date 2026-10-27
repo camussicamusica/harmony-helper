@@ -163,6 +163,12 @@
   transition: filter 120ms ease;
 }
 
+/* Pointer inside a note's invisible hover zone (set by ScoreView's nearest-note hit test). */
+.score-root.in-note-zone,
+.score-root.in-note-zone svg {
+  cursor: pointer;
+}
+
 /* Hovering a note no longer repaints the whole <g> (stem, flag, chord mates): only its own head, below. */
 
 .score-root .vf-notehead path {

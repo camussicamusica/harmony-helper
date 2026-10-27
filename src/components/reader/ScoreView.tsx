@@ -20,6 +20,7 @@ import { readScoreMeta, type ScoreMeta } from "@/lib/music/analysis/scoreMeta";
 import type { PieceChord } from "@/lib/music/analysis/pieceChords";
 import { getPalette, getRole } from "@/lib/colors/store";
 import { headHoverStyle, spelledPc } from "@/lib/colors/noteChip";
+import { buildNoteHitIndex, nearestNoteHit, type HeadBox, type NoteHitIndex } from "@/lib/music/noteHit";
 import { ChordNoteChips } from "@/components/analysis/ChordNoteChips";
 import { intervalRole, intervalSignature, noteSignature, noteTargetOn, subscribe as subscribeColors } from "@/lib/colors/store";
 import type { Hand, IsolationMode, ScheduledNote, ScoreView as ViewMode } from "@/lib/music/types";
@@ -196,6 +197,9 @@ export function ScoreView({
   const patternHitsRef = useRef<PatternHit[]>([]);
   const patternHoverRef = useRef<string | null>(null);
   /** Top and bottom (px, relative to the wrapper) of every staff, per system id, top staff first. */
+  /** Hit-test index of the notehead zones (rebuilt by measure()) + the note currently lit by the pointer. */
+  const hitIndexRef = useRef<NoteHitIndex | null>(null);
+  const hoverRef = useRef<{ note: ScheduledNote; els: Element[]; head?: SVGElement; x: number; y: number } | null>(null);
   const staffRowsRef = useRef<Map<number, Array<{ top: number; bottom: number }>>>(new Map());
   /** Length of one measure in seconds: a silence this long cuts the degradé. */
   const measureSecRef = useRef(0);
@@ -336,6 +340,93 @@ export function ScoreView({
     }
     systemTopRef.current = m;
     staffRowsRef.current = staffRows;
+
+    // Hover zones: one box per notehead (wrap-relative px), staff spacing and stave midpoints per system.
+    const spBySys = new Map<number, number>();
+    const splits = new Map<number, number[]>();
+    for (const [id, rs] of staffRows) {
+      const sps = rs.map((r) => (r.bottom - r.top) / 4).filter((v) => v > 1);
+      if (sps.length) spBySys.set(id, sps.reduce((a, b) => a + b, 0) / sps.length);
+      splits.set(id, rs.slice(1).map((r, i) => (rs[i].bottom + r.top) / 2));
+    }
+    const boxes: HeadBox[] = [];
+    for (const n of notes) {
+      if (n.cx === undefined || n.cy === undefined) continue;
+      const sp = spBySys.get(n.system ?? 0) ?? 8;
+      let w = sp * 1.3;
+      let h = sp;
+      if (n.headEl?.isConnected) {
+        const r = n.headEl.getBoundingClientRect();
+        if (r.width || r.height) {
+          w = r.width;
+          h = r.height;
+        }
+      }
+      boxes.push({ id: String(n.id), system: n.system ?? 0, x: n.cx, y: n.cy, w, h });
+    }
+    hitIndexRef.current = buildNoteHitIndex(boxes, { staffSpace: spBySys, splits });
+  };
+
+  /** Stop lighting the hovered note: head, <g>, piano key and bubble. */
+  const clearNoteHover = () => {
+    const cur = hoverRef.current;
+    if (!cur) return;
+    hoverRef.current = null;
+    activeNotes.removeHover(cur.note.midi, cur.note.hand);
+    cur.els.forEach((el) => el.classList.remove("note-hover"));
+    cur.head?.classList.remove("head-hover-fill", "head-hover-glow");
+    containerRef.current?.classList.remove("in-note-zone");
+    setTooltip(null);
+  };
+
+  /** Light a note exactly as the old per-head hover did; the bubble sits beside the head, not under the cursor. */
+  const showNoteHover = (note: ScheduledNote) => {
+    const head = note.headEl?.isConnected ? note.headEl : undefined;
+    const shared = (g: SVGGElement) => notesRef.current.filter((n) => n.svgEls?.[0] === g).length > 1;
+    const els: Element[] = (note.svgEls ?? []).map((g) => (shared(g) && head ? head : g));
+    activeNotes.addHover(note.midi, note.hand);
+    els.forEach((el) => el.classList.add("note-hover"));
+    if (head) {
+      const hh = headHoverStyle(spelledPc(note.spelledName) >= 0 ? spelledPc(note.spelledName) : note.midi % 12, getPalette().roles);
+      if (hh) {
+        head.style.setProperty("--head-color", hh.color);
+        head.classList.add(hh.mode === "fill" ? "head-hover-fill" : "head-hover-glow");
+      }
+    }
+    containerRef.current?.classList.add("in-note-zone");
+    hoverRef.current = { note, els, head, x: NaN, y: NaN };
+  };
+
+  /** Bubble position: just right of and below the lit head (re-read live, so Tocar's auto-scroll keeps it attached). */
+  const placeTooltip = (note: ScheduledNote, force: boolean) => {
+    const cur = hoverRef.current;
+    if (!cur) return;
+    const r = (note.headEl?.isConnected ? note.headEl : note.svgEls?.[0])?.getBoundingClientRect();
+    if (!r) return;
+    const x = Math.round(r.right);
+    const y = Math.round(r.bottom - 6);
+    if (!force && x === cur.x && y === cur.y) return;
+    cur.x = x;
+    cur.y = y;
+    const live = notesRef.current.find((n) => n.id === note.id) ?? note;
+    setTooltip({ x, y, ...hoverText(live, notesRef.current) });
+  };
+
+  /** Pointer (client px) -> nearest note zone -> hover. Overlays with their own hit target keep priority. */
+  const updateNoteHover = (cx: number, cy: number, target: EventTarget | null, buttons: number) => {
+    const wrap = wrapRef.current;
+    const idx = hitIndexRef.current;
+    const overlay = [overlayRef, chordSvgRef, hardSvgRef].some((r) => r.current && target instanceof Node && r.current.contains(target));
+    if (!wrap || !idx || overlay || buttons !== 0) return clearNoteHover();
+    const wr = wrap.getBoundingClientRect();
+    const hit = nearestNoteHit({ x: cx - wr.left, y: cy - wr.top }, idx);
+    const note = hit ? notesRef.current.find((n) => String(n.id) === hit.id) : undefined;
+    if (!note) return clearNoteHover();
+    if (hoverRef.current?.note.id !== note.id) {
+      clearNoteHover();
+      showNoteHover(note);
+      placeTooltip(note, true);
+    } else placeTooltip(note, false);
   };
 
   /** Where a chord mark sits: x over its first notes, y above the top staff of that system. */
@@ -994,64 +1085,8 @@ export function ScoreView({
     paintNotes(notes);
     measure(notes);
 
-    // Chord mates share one <g>: for them the bubble listens on the note's own head, so it names the right note.
-    const perG = new Map<Element, number>();
-    for (const n of notes) {
-      const g0 = n.svgEls?.[0];
-      if (g0) perG.set(g0, (perG.get(g0) ?? 0) + 1);
-    }
-    for (const note of notes) {
-      if (!note.svgEls?.length) continue;
-      for (const gEl of note.svgEls) {
-        const el: SVGElement = (perG.get(gEl) ?? 0) > 1 && note.headEl ? note.headEl : gEl;
-        const show = (ev: MouseEvent) => {
-          const live = notesRef.current.find((n) => n.id === note.id) ?? note;
-          const txt = hoverText(live, notesRef.current);
-          setTooltip({ x: ev.clientX, y: ev.clientY, ...txt });
-        };
-        const onEnter = (ev: MouseEvent) => {
-          activeNotes.addHover(note.midi, note.hand);
-          el.classList.add("note-hover");
-          show(ev);
-        };
-        const onMove = (ev: MouseEvent) => {
-          setTooltip((t) => (t ? { ...t, x: ev.clientX, y: ev.clientY } : t));
-        };
-        const onLeave = () => {
-          activeNotes.removeHover(note.midi, note.hand);
-          el.classList.remove("note-hover");
-          setTooltip(null);
-        };
-        el.addEventListener("mouseenter", onEnter);
-        el.addEventListener("mousemove", onMove);
-        el.addEventListener("mouseleave", onLeave);
-        cleanupRef.current.push(() => {
-          el.removeEventListener("mouseenter", onEnter);
-          el.removeEventListener("mousemove", onMove);
-          el.removeEventListener("mouseleave", onLeave);
-        });
-      }
-    }
-
-    // Per-notehead hover: only that head lights up (fill when its color is not shown, glow when it is).
-    for (const note of notes) {
-      const head = note.headEl;
-      if (!head || !head.isConnected) continue;
-      const enter = () => {
-        const hh = headHoverStyle(spelledPc(note.spelledName) >= 0 ? spelledPc(note.spelledName) : note.midi % 12, getPalette().roles);
-        if (!hh) return;
-        head.style.setProperty("--head-color", hh.color);
-        head.classList.add(hh.mode === "fill" ? "head-hover-fill" : "head-hover-glow");
-      };
-      const leave = () => head.classList.remove("head-hover-fill", "head-hover-glow");
-      head.addEventListener("mouseenter", enter);
-      head.addEventListener("mouseleave", leave);
-      cleanupRef.current.push(() => {
-        head.removeEventListener("mouseenter", enter);
-        head.removeEventListener("mouseleave", leave);
-        leave();
-      });
-    }
+    // Hover is handled by one pointer listener on the score (nearest-note zones), see the "Note hover zones" effect.
+    hoverRef.current = null;
 
     drawPatterns();
     drawDegrade();
@@ -1134,6 +1169,46 @@ export function ScoreView({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [xml, reloadNonce, view]);
+
+  // Note hover zones — one pointer listener on the score; hit testing is a cheap search in precomputed boxes, rAF-throttled.
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    const sc = scrollRef.current;
+    if (!wrap) return;
+    let raf = 0;
+    let last: { x: number; y: number; target: EventTarget | null; buttons: number } | null = null;
+    const run = () => {
+      raf = 0;
+      if (last) updateNoteHover(last.x, last.y, last.target, last.buttons);
+    };
+    const queue = () => {
+      if (!raf) raf = requestAnimationFrame(run);
+    };
+    const onMove = (e: PointerEvent) => {
+      last = { x: e.clientX, y: e.clientY, target: e.target, buttons: e.buttons };
+      queue();
+    };
+    const onLeave = () => {
+      last = null;
+      clearNoteHover();
+    };
+    const onScroll = () => {
+      if (last) queue(); // the score moved under a still pointer
+    };
+    wrap.addEventListener("pointermove", onMove);
+    wrap.addEventListener("pointerleave", onLeave);
+    sc?.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      wrap.removeEventListener("pointermove", onMove);
+      wrap.removeEventListener("pointerleave", onLeave);
+      sc?.removeEventListener("scroll", onScroll);
+      window.removeEventListener("scroll", onScroll);
+      if (raf) cancelAnimationFrame(raf);
+      clearNoteHover();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Zoom — re-render OSMD and re-wire listeners + line.
   useEffect(() => {
