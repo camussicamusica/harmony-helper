@@ -12,7 +12,7 @@ import { MidiControl } from "./MidiControl";
 import { useLayersOpen } from "@/lib/music/analysis/useFicha";
 import type { DegradeLayer, PatternLayer } from "@/lib/music/analysis/usePatternLayer";
 import { DegradeControls, PatternsControls } from "./LayerControls";
-import { ChevronDown, Keyboard, Layers, ListMusic, Minus, Pause, Play, Plus, Route, Square } from "lucide-react";
+import { ChevronDown, ChevronUp, Layers, ListMusic, Minus, Pause, Play, Plus, Route, Square } from "lucide-react";
 
 interface Props {
   isPlaying: boolean;
@@ -25,7 +25,9 @@ interface Props {
   line: boolean;
   intervals: boolean;
   lineMode: LineColorMode;
-  showKeyboard: boolean;
+  menuOpen: boolean;
+  animate: boolean;
+  onMenuToggle: () => void;
   fichaOpen: boolean;
   recorridoOpen: boolean;
   onRecorridoToggle: () => void;
@@ -40,7 +42,6 @@ interface Props {
   onLineChange: (v: boolean) => void;
   onIntervalsChange: (v: boolean) => void;
   onLineModeChange: (m: LineColorMode) => void;
-  onShowKeyboardChange: (v: boolean) => void;
   onScoreLoaded: (musicXml: string, filename: string) => void;
   patternLayer: PatternLayer;
   degradeLayer: DegradeLayer;
@@ -61,7 +62,9 @@ export function TopBar({
   line,
   intervals,
   lineMode,
-  showKeyboard,
+  menuOpen,
+  animate,
+  onMenuToggle,
   fichaOpen,
   recorridoOpen,
   onRecorridoToggle,
@@ -76,7 +79,6 @@ export function TopBar({
   onLineChange,
   onIntervalsChange,
   onLineModeChange,
-  onShowKeyboardChange,
   onScoreLoaded,
   patternLayer,
   degradeLayer,
@@ -91,7 +93,9 @@ export function TopBar({
   };
 
   return (
-    <header className="sticky top-0 z-30 flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-border bg-card px-4 py-2">
+    <header className="sticky top-0 z-30 border-b border-border bg-card px-4 py-2">
+      {/* Always-visible row: the essentials. */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
       <h1 className="text-base font-semibold tracking-tight">
         Harmony Helper
         {isPlaying && <span className="ml-2 text-xs italic text-muted-foreground">Reproduciendo</span>}
@@ -133,8 +137,40 @@ export function TopBar({
         </Button>
       </div>
 
-      <TempoControl bpm={bpm} scoreBpm={scoreBpm} hasWrittenTempo={hasWrittenTempo} onChange={onBpmChange} />
+      <TempoControl
+        bpm={bpm}
+        scoreBpm={scoreBpm}
+        hasWrittenTempo={hasWrittenTempo}
+        onChange={onBpmChange}
+        compact={!menuOpen}
+      />
 
+      <Button
+        size="sm"
+        variant="ghost"
+        className="ml-auto h-8 gap-1 px-2 text-xs"
+        aria-expanded={menuOpen}
+        aria-controls="top-menu-panel"
+        aria-label={menuOpen ? "Ocultar menú" : "Mostrar menú"}
+        title={`${menuOpen ? "Ocultar menú" : "Mostrar menú"} (tecla m)`}
+        onClick={onMenuToggle}
+      >
+        {menuOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        {menuOpen ? "Ocultar menú" : "Mostrar menú"}
+      </Button>
+      </div>
+
+      {/* Collapsible rest of the menu. */}
+      <div
+        id="top-menu-panel"
+        inert={!menuOpen}
+        aria-hidden={!menuOpen}
+        className={`grid ${animate ? "transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none" : ""} ${
+          menuOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+        }`}
+      >
+      <div className="-mx-1 min-h-0 overflow-hidden px-1">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 pt-1.5">
       <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
         {(["both", "rh", "lh"] as IsolationMode[]).map((m) => {
           const active = isolation === m;
@@ -222,18 +258,6 @@ export function TopBar({
           <span className={line ? "italic text-foreground" : ""}>Línea melódica</span>
         </label>
 
-        {view === "estudiar" && (
-          <Button
-            size="sm"
-            variant={showKeyboard ? "secondary" : "ghost"}
-            className="h-7 gap-1 px-2 text-xs"
-            onClick={() => onShowKeyboardChange(!showKeyboard)}
-          >
-            <Keyboard className="h-3.5 w-3.5" />
-            {showKeyboard ? "Ocultar teclado" : "Mostrar teclado"}
-          </Button>
-        )}
-
         <NoteColorStrip />
 
         <MidiControl />
@@ -294,6 +318,9 @@ export function TopBar({
           )}
         </div>
       )}
+      </div>
+      </div>
+      </div>
     </header>
   );
 }

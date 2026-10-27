@@ -37,11 +37,38 @@ import {
   saveTempo,
   stepBpm,
 } from "@/lib/music/tempo";
+import { useUiPrefs } from "@/lib/ui/uiPrefs";
 import { useAlwaysLabels, useLineMode } from "@/lib/music/lineMode";
 import { applyInterfaceVars } from "@/lib/colors/store";
 import type { IsolationMode, ScheduledNote, ScoreView as ViewMode } from "@/lib/music/types";
 
 const VIEW_KEY = "hh.view.v1";
+/** Last opened score (raw MusicXML + filename), so a reload or a dev-server refresh does not drop it. */
+const LAST_SCORE_KEY = "hh.lastScore.v1";
+/** Skip saving above this many characters (localStorage holds ~5 MB). */
+const LAST_SCORE_MAX_CHARS = 2_000_000;
+
+function saveLastScore(xml: string, filename: string) {
+  try {
+    if (xml.length > LAST_SCORE_MAX_CHARS) {
+      localStorage.removeItem(LAST_SCORE_KEY);
+      return;
+    }
+    localStorage.setItem(LAST_SCORE_KEY, JSON.stringify({ xml, filename }));
+  } catch {
+    /* quota or blocked storage: the score just is not remembered */
+  }
+}
+
+function loadLastScore(): { xml: string; filename: string } | null {
+  try {
+    const o = JSON.parse(localStorage.getItem(LAST_SCORE_KEY) ?? "null");
+    if (o && typeof o.xml === "string" && o.xml.length > 0) return { xml: o.xml, filename: String(o.filename ?? "") };
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
 
 export function ReaderPage() {
   const [xml, setXml] = useState<string>(SAMPLE_MUSICXML);
@@ -59,7 +86,9 @@ export function ReaderPage() {
   const [lineMode, setLineMode] = useLineMode();
   const [view, setViewState] = useState<ViewMode>("tocar");
   const [viewReady, setViewReady] = useState(false);
-  const [showKeyboard, setShowKeyboard] = useState(false);
+  const ui = useUiPrefs();
+  const uiRef = useRef(ui);
+  uiRef.current = ui;
   const [scoreVersion, setScoreVersion] = useState(0);
 
   const [fichaOpen, setFichaOpen] = useState(false);
@@ -124,9 +153,12 @@ export function ReaderPage() {
     } catch {
       /* ignore */
     }
+    const last = loadLastScore();
+    const startXml = last?.xml ?? xml;
+    if (last) setXml(last.xml);
     setViewReady(true);
     try {
-      const start = resolveInitialBpm(loadSavedTempo(localStorage, hashText(xml)), parseWrittenTempo(xml));
+      const start = resolveInitialBpm(loadSavedTempo(localStorage, hashText(startXml)), parseWrittenTempo(startXml));
       applyTempoNow(start);
       setShownBpm(start);
     } catch {
@@ -212,7 +244,27 @@ export function ReaderPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleScoreLoaded = (musicXml: string, _filename: string) => {
+  // Keys "m" (top menu) and "p" (piano) show/hide them, unless she is typing somewhere.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented || e.repeat) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      const k = e.key.toLowerCase();
+      if (k === "m") {
+        e.preventDefault();
+        uiRef.current.toggleMenu();
+      } else if (k === "p") {
+        e.preventDefault();
+        uiRef.current.togglePiano();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  const handleScoreLoaded = (musicXml: string, filename: string) => {
+    saveLastScore(musicXml, filename);
     handleStop();
     if (bpmTimer.current) clearTimeout(bpmTimer.current);
     bpmTimer.current = null;
@@ -297,7 +349,6 @@ export function ReaderPage() {
   const clampZoom = (z: number) => Math.max(0.5, Math.min(2.5, Math.round(z * 100) / 100));
 
   const tocar = view === "tocar";
-  const pianoVisible = tocar || showKeyboard;
 
   return (
     <div
@@ -316,7 +367,9 @@ export function ReaderPage() {
         line={line}
         intervals={intervals}
         lineMode={lineMode}
-        showKeyboard={showKeyboard}
+        menuOpen={ui.menuOpen}
+        animate={ui.animate}
+        onMenuToggle={ui.toggleMenu}
         fichaOpen={fichaOpen}
         onFichaToggle={() => setFichaOpen((v) => !v)}
         recorridoOpen={recorridoOpen}
@@ -331,7 +384,6 @@ export function ReaderPage() {
         onLineChange={setLine}
         onIntervalsChange={setIntervals}
         onLineModeChange={setLineMode}
-        onShowKeyboardChange={setShowKeyboard}
         onScoreLoaded={handleScoreLoaded}
         patternLayer={patternLayer}
         degradeLayer={degradeLayer}
@@ -369,15 +421,14 @@ export function ReaderPage() {
             />
           )}
         </section>
-        {pianoVisible && (
-          <section
-            className={`h-[172px] shrink-0 bg-background ${
-              tocar ? "" : "sticky bottom-0 z-20 border-t border-border"
-            }`}
-          >
-            <PianoView isolation={isolation} />
-          </section>
-        )}
+        <section className={`shrink-0 bg-background ${tocar ? "" : "sticky bottom-0 z-20 border-t border-border"}`}>
+          <PianoView
+            isolation={isolation}
+            open={ui.pianoOpen}
+            animate={ui.animate}
+            onToggle={ui.togglePiano}
+          />
+        </section>
       </main>
       <FichaPanel
         open={fichaOpen}

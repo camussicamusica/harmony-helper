@@ -104,15 +104,42 @@ Son dos modos de ver la partitura. Los botones están arriba a la izquierda.
 **"Tocar":**
 1. La partitura es una sola línea larga que se desliza de costado.
 2. Hay una raya vertical fija. Al reproducir, la partitura se mueve y la nota actual pasa por esa raya.
-3. El piano queda siempre visible abajo.
+3. El piano se ve abajo, centrado. Podés esconderlo (ver 3.1).
 4. Cuando está en pausa, podés arrastrar la partitura con el mouse hacia los lados.
 
 **"Estudiar":**
 1. Ves la partitura entera, en renglones, como en papel.
 2. Para ver más, bajás con la rueda del mouse (se mueve toda la página).
-3. El piano está escondido. Para verlo, tocá "Mostrar teclado". Para esconderlo, tocá "Ocultar teclado".
+3. El piano se ve abajo, centrado, pegado al borde de la pantalla mientras bajás. Podés esconderlo (ver 3.1).
 
 La app recuerda el modo que elegiste la última vez.
+
+### 3.1 Más lugar para la partitura: esconder el menú y el piano
+
+**Menú de arriba:**
+1. Arriba a la derecha, tocá "Ocultar menú" (tiene una flecha hacia arriba). También podés apretar la tecla "m".
+2. El menú se achica a una sola línea fina. Quedan: el nombre "Harmony Helper", "Tocar" / "Estudiar", "Reproducir" / "Pausa", "Detener" y el tempo con "−", "♩ = número" y "+".
+3. La partitura crece y usa el lugar libre.
+4. Para volver, tocá "Mostrar menú" (flecha hacia abajo) o apretá "m" otra vez.
+5. Para usar "Zoom", "Línea melódica", "Capas", "Recorrido", "Ficha" o "Colores", primero tocá "Mostrar menú".
+
+**Piano:**
+1. Arriba del teclado hay una barra finita que dice "Piano" con una flecha. Tocala. También podés apretar la tecla "p".
+2. El teclado se esconde y queda solo la barra "Piano". La partitura crece.
+3. Para volver, tocá la barra "Piano" otra vez, o apretá "p".
+4. Ya no existe el botón "Mostrar teclado" / "Ocultar teclado": esta barra lo reemplaza, en "Tocar" y en "Estudiar".
+
+**Piano centrado:** en una ventana ancha las teclas se agrandan (hasta un tope) y el teclado queda en el medio. En una ventana angosta el teclado se desliza de costado y arranca centrado en el Do del medio.
+
+**Atajos:** "m" y "p" no funcionan si estás escribiendo en un cuadro de texto. "−" y "+" siguen cambiando el tempo.
+
+La app recuerda si dejaste el menú y el piano escondidos o visibles.
+
+### 3.2 La última partitura se recuerda
+
+1. Abrí una partitura con "Abrir partitura".
+2. Si recargás la página, la app vuelve a abrir esa misma partitura.
+3. Si el archivo es muy grande (más de 2 millones de letras), no se guarda y al recargar vuelve la partitura de ejemplo.
 
 ---
 
@@ -407,7 +434,7 @@ Usá **Chrome**. Otros navegadores no tienen MIDI.
 
 ### 9.2 Ver lo que tocás
 
-1. Si estás en "Estudiar", tocá "Mostrar teclado" para ver el piano. En "Tocar" el piano ya se ve.
+1. Si el piano está escondido, tocá la barra "Piano" (abajo, arriba del teclado) para mostrarlo.
 2. Apretá una tecla de tu teclado.
 3. En el piano de la pantalla esa tecla se llena con el color de la nota (el de tu estudio de colores) y tiene un borde oscuro con un punto blanco. Es distinto de cuando suena la pieza: ahí solo se llena, sin borde.
 4. Si apagaste el color de esa nota, la tecla se pone gris.

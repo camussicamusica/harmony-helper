@@ -11,9 +11,11 @@ interface Props {
   hasWrittenTempo: boolean;
   /** `slider` changes are debounced by the parent; everything else applies at once. */
   onChange: (bpm: number, source: "slider" | "other") => void;
+  /** Thin top bar: only − ♩=N +. */
+  compact?: boolean;
 }
 
-export function TempoControl({ bpm, scoreBpm, hasWrittenTempo, onChange }: Props) {
+export function TempoControl({ bpm, scoreBpm, hasWrittenTempo, onChange, compact = false }: Props) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -35,7 +37,7 @@ export function TempoControl({ bpm, scoreBpm, hasWrittenTempo, onChange }: Props
 
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1" role="group" aria-label="Tempo de la partitura">
-      <span className="text-xs text-muted-foreground">Tempo</span>
+      {!compact && <span className="text-xs text-muted-foreground">Tempo</span>}
       <Button
         size="icon"
         variant="outline"
@@ -81,6 +83,8 @@ export function TempoControl({ bpm, scoreBpm, hasWrittenTempo, onChange }: Props
       >
         <Plus className="h-4 w-4" />
       </Button>
+      {!compact && (
+      <>
       <div className="w-44 sm:w-56">
         <Slider
           value={[bpm]}
@@ -108,6 +112,8 @@ export function TempoControl({ bpm, scoreBpm, hasWrittenTempo, onChange }: Props
         ))}
       </div>
       {!hasWrittenTempo && <span className="text-xs italic text-muted-foreground">(sin tempo escrito)</span>}
+      </>
+      )}
     </div>
   );
 }

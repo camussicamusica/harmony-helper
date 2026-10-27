@@ -1,4 +1,5 @@
-import { useSyncExternalStore } from "react";
+import { useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { activeNotes } from "@/lib/music/scheduler";
 import { buildKeyboardGeometry, midiToName } from "@/lib/music/midiUtils";
 import type { IsolationMode } from "@/lib/music/types";
@@ -8,13 +9,21 @@ import { useMidiInput } from "@/lib/midi/input";
 
 interface Props {
   isolation: IsolationMode;
+  /** Keyboard shown (the slim "Piano" handle always stays). */
+  open: boolean;
+  /** Slide the open/close; false for the first paint. */
+  animate: boolean;
+  onToggle: () => void;
 }
 
-const WHITE_W = 22;
+const WHITE_W = 22; // narrowest key; below this the keyboard scrolls
+const MAX_WHITE_W = 32; // widest key when the window is wide
+const WHITE_KEYS = 52;
+const MIDDLE_C = 60;
 const WHITE_H = 160;
 const BLACK_H = 100;
 
-export function PianoView({ isolation }: Props) {
+export function PianoView({ isolation, open, animate, onToggle }: Props) {
   // Subscribe to active-notes store.
   useSyncExternalStore(activeNotes.subscribe, activeNotes.getSnapshot, activeNotes.getSnapshot);
 
@@ -29,7 +38,34 @@ export function PianoView({ isolation }: Props) {
     return c === PLAIN_COLOR ? RING_NEUTRAL_COLOR : c;
   };
 
-  const geom = buildKeyboardGeometry(WHITE_W);
+  // Keys grow with the window (up to MAX_WHITE_W); the keyboard is centered. Narrower than WHITE_KEYS * WHITE_W: it scrolls.
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [boxW, setBoxW] = useState(0);
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const measure = () => setBoxW(el.clientWidth);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    window.addEventListener("resize", measure);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, []);
+  const whiteW = boxW > 0 ? Math.max(WHITE_W, Math.min(MAX_WHITE_W, Math.floor((boxW / WHITE_KEYS) * 10) / 10)) : WHITE_W;
+  const geom = buildKeyboardGeometry(whiteW);
+
+  // When it does not fit, start with middle C in the middle of the view.
+  const overflows = boxW > 0 && geom.totalWidth > boxW + 1;
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (!el || !overflows) return;
+    const c = geom.keys.find((k) => k.midi === MIDDLE_C);
+    if (c) el.scrollLeft = c.x + c.width / 2 - el.clientWidth / 2;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [overflows, whiteW]);
 
   const showRH = isolation !== "lh";
   const showLH = isolation !== "rh";
@@ -44,7 +80,30 @@ export function PianoView({ isolation }: Props) {
   const blacks = geom.keys.filter((k) => k.isBlack);
 
   return (
-    <div className="h-full w-full overflow-x-auto overflow-y-hidden bg-muted/30">
+    <div>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        aria-controls="piano-panel"
+        aria-label={open ? "Ocultar piano" : "Mostrar piano"}
+        title={`${open ? "Ocultar piano" : "Mostrar piano"} (tecla p)`}
+        className="flex h-6 w-full items-center justify-center gap-1.5 border-t border-border bg-card text-xs text-muted-foreground transition-colors hover:text-foreground"
+      >
+        {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
+        Piano
+      </button>
+      <div
+        id="piano-panel"
+        inert={!open}
+        aria-hidden={!open}
+        className={`grid ${animate ? "transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none" : ""} ${
+          open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+        }`}
+      >
+      <div className="min-h-0 overflow-hidden">
+      <div ref={scrollRef} className="h-[172px] w-full overflow-x-auto overflow-y-hidden bg-muted/30">
+      <div className="mx-auto" style={{ width: geom.totalWidth }}>
       <svg
         width={geom.totalWidth}
         height={WHITE_H}
@@ -123,6 +182,10 @@ export function PianoView({ isolation }: Props) {
           );
         })}
       </svg>
+      </div>
+      </div>
+      </div>
+      </div>
     </div>
   );
 }
