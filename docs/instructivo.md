@@ -69,6 +69,25 @@ Cuando abrís una partitura nueva, se detiene lo que estaba sonando y se reinici
 
 ---
 
+## Pasar un PDF a MusicXML (con Audiveris)
+
+**MusicXML (`.mxl`):** el archivo de música que la app entiende. Un PDF es solo una foto de las notas. Audiveris "lee" esa foto y la convierte en notas. Está instalado en tu carpeta personal de Aplicaciones (`~/Applications/Audiveris.app`).
+
+1. Abrí la Terminal.
+2. Escribí `~/code/harmony-helper/scripts/pdf-a-musicxml.sh` y dejá un espacio al final. No apretes Enter todavía.
+3. Arrastrá el PDF desde el Finder a la ventana de la Terminal. Se escribe solo el nombre del archivo.
+4. Apretá Enter.
+5. Esperá: tarda entre 1 y 3 minutos por página. Al final dice **"✓ Listo"** y cuántos compases leyó.
+6. El `.mxl` queda en la misma carpeta que el PDF, con el mismo nombre. Si ya había uno, no lo pisa: crea `nombre-2.mxl`.
+7. En la app, apretá **"Abrir partitura"** y elegí ese `.mxl`.
+8. Revisá las notas: el lector siempre se equivoca en algo.
+
+Qué esperar:
+- **PDFs hechos en un programa** (como los de Fito o la Gymnopédie): salen bastante bien.
+- **Escaneos borrosos, fotos o partituras a mano:** salen con más errores.
+- **Tablaturas de guitarra:** el pentagrama de tablatura aparece vacío. Las notas del pentagrama normal sí se leen.
+- Podés pasar varios PDFs de una vez: arrastrá varios en el paso 3.
+
 ## 3. Tocar vs Estudiar
 
 Son dos modos de ver la partitura. Los botones están arriba a la izquierda.
