@@ -30,7 +30,19 @@ import { getPalette, getRole } from "@/lib/colors/store";
 import { headHoverStyle, spelledPc } from "@/lib/colors/noteChip";
 import { buildNoteHitIndex, nearestNoteHit, type HeadBox, type NoteHitIndex } from "@/lib/music/noteHit";
 import { bandScrollTop } from "@/lib/music/scrollMath";
-import { clientToSvg, closeupBox } from "@/lib/music/closeup";
+import {
+  assignModifiers,
+  clefForNote,
+  clefGlyph,
+  clientToSvg,
+  closeupBox,
+  ledgerLineYs,
+  measuredStep,
+  pickNearestStaff,
+  placePanel,
+  shouldFlip,
+  staffLineYs,
+} from "@/lib/music/closeup";
 import { readTipMore, writeTipMore } from "@/lib/ui/uiPrefs";
 import { ChordNoteChips } from "@/components/analysis/ChordNoteChips";
 import { intervalRole, intervalSignature, noteSignature, noteTargetOn, subscribe as subscribeColors } from "@/lib/colors/store";
@@ -270,7 +282,7 @@ export function ScoreView({
   const keyHoverRef = useRef<{ zone: KeyZone; els: Element[] } | null>(null);
   /** Cropped, enlarged copy of the printed score around the hovered note (the "photo" at the top of the panel). */
   const [panelCloseup, setPanelCloseup] = useState<SVGSVGElement | null>(null);
-  const [panelPos, setPanelPos] = useState<{ side: "left" | "right"; shiftY: number; maxH: number }>({ side: "right", shiftY: 0, maxH: 600 });
+  const [panelPos, setPanelPos] = useState<{ side: "left" | "right"; shiftY: number; maxH: number; flipped: boolean }>({ side: "right", shiftY: 0, maxH: 600, flipped: false });
   /** "Más": armonía, suenan ahora and melodía are open (remembered in hh.ui.v1). */
   const [tipMore, setTipMore] = useState(false);
   const tipRootRef = useRef<HTMLDivElement | null>(null);
@@ -677,38 +689,87 @@ export function ScoreView({
       const hr = head.getBoundingClientRect();
       const c = clientToSvg({ x: hr.left + hr.width / 2, y: hr.top + hr.height / 2 }, svgRect, vb);
       const k = vb.w / (svgRect.width || 1); // client px -> svg units
-      const wr = wrap.getBoundingClientRect();
-      const rows = staffRowsRef.current.get(note.system ?? 0) ?? [];
       const clientCy = hr.top + hr.height / 2;
-      const row = [...rows].sort(
-        (a, b) => Math.abs((a.top + a.bottom) / 2 + wr.top - clientCy) - Math.abs((b.top + b.bottom) / 2 + wr.top - clientCy),
-      )[0];
-      if (!row) return null;
-      const sp = ((row.bottom - row.top) / 4) * k;
-      const figureYs = notesRef.current
-        .filter((n) => n.cy !== undefined && n.hand === note.hand && (n.system ?? 0) === (note.system ?? 0) && Math.abs(n.startSec - note.startSec) < 1e-3)
-        .map((n) => clientToSvg({ x: 0, y: n.cy! + wr.top }, svgRect, vb).y);
-      const box = closeupBox({
-        cx: c.x,
-        cy: c.y,
-        sp,
-        staffTop: clientToSvg({ x: 0, y: row.top + wr.top }, svgRect, vb).y,
-        staffBottom: clientToSvg({ x: 0, y: row.bottom + wr.top }, svgRect, vb).y,
-        figureYs,
+      const group = head.closest(".vf-stavenote") ?? head.parentElement;
+      // The five printed lines of the head's own staff: zero-height line paths that span the head, grouped into staves.
+      const spHint = Math.max(4, hr.height * 0.95);
+      const nearYs: number[] = [];
+      svg.querySelectorAll("g.staffline path").forEach((p) => {
+        const r = p.getBoundingClientRect();
+        if (r.height < 0.5 && r.width > spHint * 4 && r.left <= hr.left && r.right >= hr.right && Math.abs(r.top - clientCy) < 14 * spHint) nearYs.push(r.top);
       });
-      // Same child-index path from the root, to find the head inside the clone.
-      const path: number[] = [];
-      for (let el: Element | null = head; el && el !== svg; el = el.parentElement) {
-        path.unshift(Array.prototype.indexOf.call(el.parentElement?.children ?? [], el));
+      const lines = pickNearestStaff(nearYs, spHint, clientCy);
+      if (!lines) return null;
+      const spPx = (lines.bottom - lines.top) / 4;
+      const sp = spPx * k;
+      const staffTopY = clientToSvg({ x: 0, y: lines.top }, svgRect, vb).y;
+      const staffBottomY = clientToSvg({ x: 0, y: lines.bottom }, svgRect, vb).y;
+      const clef = clefForNote(note.spelledName, note.midi, measuredStep(clientCy, lines.bottom, spPx), note.hand);
+      // Which pieces of the printed note belong to THIS head: its own paths, the stem, its accidental and dots.
+      const keep: Element[] = [];
+      let stemY: number | undefined;
+      if (group) {
+        const headPaths: Element[] = head.tagName.toLowerCase() === "path" ? [head] : Array.from(head.querySelectorAll("path"));
+        keep.push(...headPaths);
+        const allHeads = Array.from(group.querySelectorAll(".vf-notehead path"));
+        const heads = allHeads.length ? allHeads : headPaths;
+        const rect = (e: Element) => e.getBoundingClientRect();
+        const ownIdx = heads.findIndex((h) => headPaths.includes(h));
+        const mods = Array.from(group.querySelectorAll(".vf-modifiers path"));
+        const owner = assignModifiers(
+          heads.map((h) => ({ cy: rect(h).top + rect(h).height / 2, left: rect(h).left, right: rect(h).right })),
+          mods.map((m) => ({ cy: rect(m).top + rect(m).height / 2, left: rect(m).left, right: rect(m).right, w: rect(m).width })),
+          spPx,
+        );
+        mods.forEach((m, i) => {
+          if (ownIdx >= 0 && owner[i] === ownIdx) keep.push(m);
+        });
+        group.querySelectorAll(".vf-stem, .vf-flag").forEach((e) => {
+          keep.push(e);
+          const r = rect(e);
+          if (r.height > 0 && e.classList.contains("vf-stem")) {
+            const far = Math.abs(r.top - clientCy) > Math.abs(r.bottom - clientCy) ? r.top : r.bottom;
+            stemY = clientToSvg({ x: 0, y: far }, svgRect, vb).y;
+          }
+        });
+      } else {
+        keep.push(head);
       }
+      const box = closeupBox({ cx: c.x, cy: c.y, sp, staffTop: staffTopY, staffBottom: staffBottomY, clef, stemY });
+      // Same child-index path from the root, to find an element inside the clone.
+      const pathOf = (el: Element): number[] => {
+        const path: number[] = [];
+        for (let e: Element | null = el; e && e !== svg; e = e.parentElement) {
+          path.unshift(Array.prototype.indexOf.call(e.parentElement?.children ?? [], e));
+        }
+        return path;
+      };
       const clone = svg.cloneNode(true) as SVGSVGElement;
+      const inClone = (el: Element): Element | undefined => {
+        let t: Element | undefined = clone;
+        for (const i of pathOf(el)) t = t?.children[i];
+        return t;
+      };
       clone.querySelectorAll("[id]").forEach((e) => e.removeAttribute("id"));
       clone.removeAttribute("id");
       clone.querySelectorAll(".note-hover, .note-halo, .head-hover-fill, .head-hover-glow, .chord-hl").forEach((e) => {
         e.classList.remove("note-hover", "note-halo", "head-hover-fill", "head-hover-glow", "chord-hl");
       });
-      let target: Element | undefined = clone;
-      for (const i of path) target = target?.children[i];
+      // Everything is hidden except the pieces above: visibility is inherited, so a "visible" leaf shows through.
+      clone.setAttribute("style", "visibility:hidden");
+      for (const el of keep) {
+        const t = inClone(el);
+        if (!t) continue;
+        (t as SVGElement).style.visibility = "visible";
+        // A stem is the printed black one (the page may tint it with a chord mate's color).
+        if (el.classList.contains("vf-stem") || el.classList.contains("vf-flag")) {
+          [t, ...Array.from(t.querySelectorAll("*"))].forEach((e) => {
+            (e as SVGElement).style.stroke = "#111";
+            if (e.tagName.toLowerCase() === "path") (e as SVGElement).style.fill = "#111";
+          });
+        }
+      }
+      const target = inClone(head);
       if (target) {
         const pc = spelledPc(note.spelledName) >= 0 ? spelledPc(note.spelledName) : note.midi % 12;
         const color = headHoverStyle(pc, getPalette().roles)?.color ?? pitchClassColor(note.midi); // same color as the tag
@@ -719,11 +780,42 @@ export function ScoreView({
         if (target.tagName.toLowerCase() === "path") paint(target);
         else target.querySelectorAll("path").forEach(paint);
       }
+      // The bare staff: 5 lines across the whole window, the ledger lines this note needs, and a small clef at the left.
+      const NS = "http://www.w3.org/2000/svg";
+      const gx = document.createElementNS(NS, "g");
+      gx.setAttribute("style", "visibility:visible");
+      gx.setAttribute("stroke", "#111");
+      const hline = (y: number, x1: number, x2: number, w: number) => {
+        const l = document.createElementNS(NS, "line");
+        l.setAttribute("x1", String(x1));
+        l.setAttribute("x2", String(x2));
+        l.setAttribute("y1", String(y));
+        l.setAttribute("y2", String(y));
+        l.setAttribute("stroke-width", String(w));
+        gx.appendChild(l);
+      };
+      const vx = box.viewBox.x;
+      for (const y of staffLineYs(staffTopY, sp)) hline(y, vx, vx + box.viewBox.w, sp * 0.1);
+      const headW = Math.max(sp * 1.1, hr.width * k);
+      for (const y of ledgerLineYs(c.y, staffBottomY, sp)) hline(y, c.x - headW * 0.95, c.x + headW * 0.95, sp * 0.13);
+      const g = clefGlyph(clef, staffBottomY, sp);
+      const t = document.createElementNS(NS, "text");
+      t.setAttribute("x", String(box.clefX));
+      t.setAttribute("y", String(g.baseline));
+      t.setAttribute("font-size", String(g.size));
+      t.setAttribute("fill", "#111");
+      t.setAttribute("stroke", "none");
+      t.setAttribute("style", 'font-family:"Noto Music","Bravura Text","Apple Symbols","Segoe UI Symbol",serif;visibility:visible');
+      t.setAttribute("data-testid", "closeup-clef");
+      t.textContent = g.glyph;
+      gx.appendChild(t);
+      clone.appendChild(gx);
+      clone.setAttribute("data-clef", clef);
+      clone.setAttribute("data-head-y", String(box.headY));
       clone.setAttribute("viewBox", `${box.viewBox.x} ${box.viewBox.y} ${box.viewBox.w} ${box.viewBox.h}`);
       clone.setAttribute("width", String(box.width));
       clone.setAttribute("height", String(box.height));
       clone.setAttribute("preserveAspectRatio", "xMidYMid meet");
-      clone.removeAttribute("style");
       clone.setAttribute("aria-hidden", "true");
       return clone;
     } catch {
@@ -1739,20 +1831,46 @@ export function ScoreView({
     const side: "left" | "right" = wantLeft || tr.right + w + 8 > window.innerWidth ? "left" : "right";
     const margin = 8;
     const pr = panel.getBoundingClientRect();
-    // The close-up photo sits on the same horizontal line as the tag: its centre follows the tag's centre.
+    // The close-up photo's notehead sits at the tag's centre height, always (placePanel). Little room below it: NOTA and the rest
+    // go above the photo instead (flipped); the part that does not fit scrolls inside the card.
     const photo = panel.querySelector("[data-testid=tip-closeup]");
+    const card = panel.firstElementChild as HTMLElement | null;
     let shiftY: number;
-    if (photo) {
-      const ph = photo.getBoundingClientRect();
-      shiftY = Math.round(panelPos.shiftY + (tr.top + tr.height / 2 - (ph.top + ph.height / 2)));
+    let maxH: number;
+    let flipped = false;
+    if (photo && card) {
+      const ph = photo.querySelector("svg")?.getBoundingClientRect() ?? photo.getBoundingClientRect();
+      const headY = Number(photo.querySelector("svg")?.getAttribute("data-head-y")) || ph.height / 2;
+      const cr = card.getBoundingClientRect();
+      const tagCy = tr.top + tr.height / 2;
+      if (shouldFlip(tagCy, ph.height - headY, window.innerHeight, margin) !== panelPos.flipped) {
+        // Layout must change first; this effect runs again with the new layout's measurements.
+        setPanelPos((p) => ({ ...p, flipped: !p.flipped }));
+        return;
+      }
+      const scroller = card.querySelector("[data-tip-scroll]") as HTMLElement | null;
+      const natural = scroller ? cr.height - scroller.clientHeight + scroller.scrollHeight : cr.height;
+      const pl = placePanel({
+        tagCenterY: tagCy,
+        photoBelow: ph.height - headY,
+        photoFromTop: ph.top + headY - cr.top,
+        photoFromBottom: cr.bottom - (ph.top + headY),
+        cardH: natural,
+        viewportH: window.innerHeight,
+        margin,
+      });
+      flipped = pl.flipped;
+      shiftY = Math.round(pl.top - tr.top);
+      maxH = Math.round(pl.maxH);
     } else {
       shiftY = Math.round(Math.min(Math.max(tr.top, margin), window.innerHeight - margin - pr.height) - tr.top);
+      const top0 = tr.top + shiftY;
+      if (top0 < margin) shiftY += Math.round(margin - top0);
+      maxH = Math.max(160, Math.round(window.innerHeight - margin - (tr.top + shiftY)));
     }
-    // Never above the viewport; the photo stays put and only the lower part scrolls inside the panel.
-    const top0 = tr.top + shiftY;
-    if (top0 < margin) shiftY += Math.round(margin - top0);
-    const maxH = Math.max(160, Math.round(window.innerHeight - margin - (tr.top + shiftY)));
-    setPanelPos((p) => (p.side === side && Math.abs(p.shiftY - shiftY) < 1 && Math.abs(p.maxH - maxH) < 2 ? p : { side, shiftY, maxH }));
+    setPanelPos((p) =>
+      p.side === side && p.flipped === flipped && Math.abs(p.shiftY - shiftY) < 1 && Math.abs(p.maxH - maxH) < 2 ? p : { side, shiftY, maxH, flipped },
+    );
   });
 
   // Pinned panel: Esc or a click anywhere else closes it.
@@ -2187,6 +2305,7 @@ export function ScoreView({
                   ctx={panelCtx}
                   scale={panelScale}
                   closeup={panelCloseup}
+                  flipped={panelPos.flipped}
                   more={tipMore}
                   onMore={(v) => {
                     setTipMore(v);
@@ -2234,7 +2353,7 @@ function PanelSection({ title, children, testId }: { title: string; children: Re
 }
 
 /** The cropped score "photo": mounts the prepared SVG clone. */
-function Closeup({ svg }: { svg: SVGSVGElement }) {
+function Closeup({ svg, flipped }: { svg: SVGSVGElement; flipped?: boolean }) {
   const ref = useRef<HTMLDivElement | null>(null);
   useLayoutEffect(() => {
     const host = ref.current;
@@ -2247,7 +2366,7 @@ function Closeup({ svg }: { svg: SVGSVGElement }) {
   return (
     <div
       ref={ref}
-      className="score-root mx-auto mb-1 overflow-hidden rounded border border-border bg-white"
+      className={`score-root mx-auto ${flipped ? "mt-1.5" : "mb-1"} overflow-hidden rounded border border-border bg-white`}
       style={{ width: svg.getAttribute("width") + "px", height: svg.getAttribute("height") + "px", maxWidth: "100%" }}
       data-testid="tip-closeup"
     />
@@ -2273,6 +2392,7 @@ function NotePanel({
   ctx,
   scale,
   closeup,
+  flipped,
   more,
   onMore,
 }: {
@@ -2280,27 +2400,37 @@ function NotePanel({
   ctx: NoteContext;
   scale: ScaleView | null;
   closeup: SVGSVGElement | null;
+  flipped?: boolean;
   more: boolean;
   onMore: (open: boolean) => void;
 }) {
   const { keyRole, chord, melody, figure, moment } = ctx;
+  const photo = closeup && <Closeup svg={closeup} flipped={flipped} />;
+  const notaSection = (
+    <PanelSection title="Nota" testId="tip-note">
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+        <ChordNoteChips spelled={[tooltip.own.spelled]} size="lg" />
+        <span className="text-sm font-medium" data-testid="tip-octave">{ctx.pitch.octaveLabel}</span>
+      </div>
+      <div className="mt-0.5 text-[11px]">
+        {tooltip.own.duration} · compás {tooltip.measure}
+        {tooltip.beat ? ` · tiempo ${tooltip.beat}` : ""}
+      </div>
+    </PanelSection>
+  );
+  // Normal: photo, NOTA, then the rest. Flipped (little room below the photo): NOTA and the rest, then the photo last.
+  const flip = !!flipped && !!closeup;
   return (
     <>
-      <div className="shrink-0">
-        {closeup && <Closeup svg={closeup} />}
-        <PanelSection title="Nota" testId="tip-note">
-          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-            <ChordNoteChips spelled={[tooltip.own.spelled]} size="lg" />
-            <span className="text-sm font-medium" data-testid="tip-octave">{ctx.pitch.octaveLabel}</span>
-          </div>
-          <div className="mt-0.5 text-[11px]">
-            {tooltip.own.duration} · compás {tooltip.measure}
-            {tooltip.beat ? ` · tiempo ${tooltip.beat}` : ""}
-          </div>
-        </PanelSection>
-      </div>
+      {!flip && (
+        <div className="shrink-0">
+          {photo}
+          {notaSection}
+        </div>
+      )}
+      {flip && <div className="shrink-0">{notaSection}</div>}
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto" data-tip-scroll>
         <PanelSection title="Su figura" testId="tip-figure">
           {figure.alone ? (
             <div className="text-[11px] text-muted-foreground">Nota sola (sin otras notas en su figura)</div>
@@ -2376,6 +2506,7 @@ function NotePanel({
           </div>
         )}
       </div>
+      {flip && <div className="shrink-0">{photo}</div>}
     </>
   );
 }
