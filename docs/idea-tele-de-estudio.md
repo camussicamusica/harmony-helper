@@ -51,6 +51,22 @@ Un panel lateral, "la tele", que espeja lo que tenés debajo del mouse y te lo m
    - los colores;
    - el navegador de acordes por la partitura.
 
+## Un formato que se repite: la ficha de cada objeto (Sofia, 2026-10-27)
+> "Yo paso el mouse por una nota y se me abre una ficha de esa nota. Como si fuese un programa de los 90."
+
+> "Como si fuese esa cartita de Digimon que tiene la fotito y la descripción."
+
+Ella nota que el mismo formato le aparece en distintas escalas: la Ficha de la pieza, la carta de nota, la carta de acorde. Es una regla de diseño, no una pantalla suelta.
+
+**Todo objeto que se observa a fondo tiene su carta, con el mismo formato:**
+- arriba, la fotito: el dibujo en un pentagrama chico;
+- abajo, la descripción.
+
+Esto vale para la nota, el acorde, la tonalidad, el compás y la pieza.
+
+- **Primer paso posible:** la burbuja del hover se convierte en carta y suma la fotito de la nota en un pentagrama chico.
+- **Estética "programa de los 90":** cartas con borde, título y fotito. Ojo: memoria ViDeus dice "sin brillo 2000"; esto es otro proyecto y el gusto lo decide Sofia, pero preguntarle si quiere el look retro de verdad o solo el formato de carta.
+
 ## Cintas de notas (Sofia, 2026-10-27): construir las dos, A y B, como capas separadas
 > "Como si la nota es naranja, el recorrido es naranja y vamos viendo cómo se entrelazan esas notas con las otras, cuando vuelven a aparecer, cuando empiezan, cuando terminan."
 

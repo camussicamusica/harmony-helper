@@ -201,7 +201,7 @@ export function ScoreView({
   /** Top and bottom (px, relative to the wrapper) of every staff, per system id, top staff first. */
   /** Hit-test index of the notehead zones (rebuilt by measure()) + the note currently lit by the pointer. */
   const hitIndexRef = useRef<NoteHitIndex | null>(null);
-  const hoverRef = useRef<{ note: ScheduledNote; els: Element[]; head?: SVGElement; x: number; y: number } | null>(null);
+  const hoverRef = useRef<{ note: ScheduledNote; els: Element[]; halo: Element[]; head?: SVGElement; x: number; y: number } | null>(null);
   const staffRowsRef = useRef<Map<number, Array<{ top: number; bottom: number }>>>(new Map());
   /** Length of one measure in seconds: a silence this long cuts the degradé. */
   const measureSecRef = useRef(0);
@@ -376,6 +376,7 @@ export function ScoreView({
     hoverRef.current = null;
     activeNotes.removeHover(cur.note.midi, cur.note.hand);
     cur.els.forEach((el) => el.classList.remove("note-hover"));
+    cur.halo.forEach((el) => el.classList.remove("note-halo"));
     cur.head?.classList.remove("head-hover-fill", "head-hover-glow");
     containerRef.current?.classList.remove("in-note-zone");
     setTooltip(null);
@@ -388,6 +389,9 @@ export function ScoreView({
     const els: Element[] = (note.svgEls ?? []).map((g) => (shared(g) && head ? head : g));
     activeNotes.addHover(note.midi, note.hand);
     els.forEach((el) => el.classList.add("note-hover"));
+    // White border around the whole note or chord (head, stem, flag) so its color stands out on any background.
+    const halo: Element[] = note.svgEls ?? [];
+    halo.forEach((el) => el.classList.add("note-halo"));
     if (head) {
       const hh = headHoverStyle(spelledPc(note.spelledName) >= 0 ? spelledPc(note.spelledName) : note.midi % 12, getPalette().roles);
       if (hh) {
@@ -396,7 +400,7 @@ export function ScoreView({
       }
     }
     containerRef.current?.classList.add("in-note-zone");
-    hoverRef.current = { note, els, head, x: NaN, y: NaN };
+    hoverRef.current = { note, els, halo, head, x: NaN, y: NaN };
   };
 
   /** Bubble position: centered on the note, under (or, without room, over) the whole system (re-read live, so Tocar auto-scroll keeps it attached). */
