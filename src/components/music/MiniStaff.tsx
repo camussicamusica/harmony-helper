@@ -24,6 +24,8 @@ export interface MiniStaffNote {
   /** Accessible name; with onClick the head is a button. */
   ariaLabel?: string;
   onClick?: () => void;
+  /** Draw only the accidental (a key-signature glyph on its line), no notehead. */
+  glyphOnly?: boolean;
 }
 
 export interface MiniStaffProps {
@@ -102,6 +104,28 @@ export function MiniStaff({ notes, clef, width = 240, height = 70, columns, aria
         const acc = n.accidental ?? parsed?.accidental ?? "";
         const interactive = !!n.onClick;
         const op = n.opacity ?? 1;
+        if (n.glyphOnly) {
+          return (
+            <text
+              key={`${n.spelled}-${i}`}
+              x={x}
+              y={y + h * 1.0}
+              fontSize={h * 7.5}
+              textAnchor="middle"
+              fill={n.fill ?? INK}
+              stroke={INK}
+              strokeWidth={0.5}
+              paintOrder="stroke"
+              opacity={op}
+              aria-hidden
+              data-testid="mini-staff-keyglyph"
+              data-note={n.spelled}
+              data-fill={n.fill ?? INK}
+            >
+              {accidentalGlyph(acc)}
+            </text>
+          );
+        }
         return (
           <g
             key={`${n.spelled}-${i}`}

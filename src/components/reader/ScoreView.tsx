@@ -6,6 +6,8 @@ import { hoverText, INTERVAL_KEY_LABEL, solfegeName } from "@/lib/music/naming";
 import { noteContext, type NoteContext } from "@/lib/music/analysis/noteContext";
 import { buildScaleView, type ScaleView } from "@/lib/music/analysis/scaleView";
 import { ScaleInKey } from "./ScaleInKey";
+import { KeyPanel } from "./KeyPanel";
+import { buildKeySigView, fifthsAtMeasure, keyEvidence, measureRangeOf, type KeySigView } from "@/lib/music/analysis/keySignature";
 import { labelWidth, layoutLabels } from "@/lib/music/analysis/chordNames";
 import { playChordMidi } from "@/lib/music/analysis/audio";
 import { detectKeyFromNotes, type KeyInfo } from "@/lib/music/analysis/key";
@@ -87,6 +89,21 @@ interface Props {
   onDegradeCap?: (cap: number) => void;
   /** Key of the piece (detected or chosen in the Ficha) for the hover panel; null = the panel detects it itself. */
   hoverKey?: KeyInfo | null;
+}
+
+/** Hover zone over a key signature (or the empty gap where one would be) at the start of a staff. */
+interface KeyZone {
+  el: SVGGElement | null;
+  x0: number;
+  y0: number;
+  y1: number;
+  x1: number;
+  system: number;
+  staff: number;
+  /** Measure the signature governs (first note to its right), null if unknown. */
+  measure: number | null;
+  /** True when no glyphs are drawn here (the zone is only meaningful for a piece with no signature). */
+  empty: boolean;
 }
 
 export interface PatternLayerView {
@@ -247,6 +264,10 @@ export function ScoreView({
   const [pinned, setPinned] = useState(false);
   const [panelCtx, setPanelCtx] = useState<NoteContext | null>(null);
   const [panelScale, setPanelScale] = useState<ScaleView | null>(null);
+  /** Key-signature hover: tag + the panel's content (same tag/panel mechanism as a note). */
+  const [keyHover, setKeyHover] = useState<{ tag: { x: number; y: number; left: boolean }; view: KeySigView } | null>(null);
+  const keyZonesRef = useRef<KeyZone[]>([]);
+  const keyHoverRef = useRef<{ zone: KeyZone; els: Element[] } | null>(null);
   /** Cropped, enlarged copy of the printed score around the hovered note (the "photo" at the top of the panel). */
   const [panelCloseup, setPanelCloseup] = useState<SVGSVGElement | null>(null);
   const [panelPos, setPanelPos] = useState<{ side: "left" | "right"; shiftY: number; maxH: number }>({ side: "right", shiftY: 0, maxH: 600 });
@@ -413,6 +434,61 @@ export function ScoreView({
       boxes.push({ id: String(n.id), system: n.system ?? 0, x: n.cx, y: n.cy, w, h });
     }
     hitIndexRef.current = buildNoteHitIndex(boxes, { staffSpace: spBySys, splits });
+
+    // Key-signature zones: one per drawn signature (both staves, every system, and mid-piece changes), plus, where no
+    // signature is drawn, the gap right after the clef (for a piece without alterations).
+    const rowOf = (cy: number) => {
+      let best = Infinity;
+      let system = 0;
+      let staff = 0;
+      for (const [id, rs] of staffRows) {
+        rs.forEach((row, i) => {
+          const d = Math.abs((row.top + row.bottom) / 2 - cy);
+          if (d < best) {
+            best = d;
+            system = id;
+            staff = i;
+          }
+        });
+      }
+      return { system, staff };
+    };
+    const firstMeasureAfter = (system: number, x: number) => {
+      let best: ScheduledNote | undefined;
+      for (const n of notes) {
+        if ((n.system ?? 0) !== system || n.cx === undefined || n.cx < x - 2) continue;
+        if (!best || n.cx < best.cx!) best = n;
+      }
+      return best?.measure ?? null;
+    };
+    const zones: KeyZone[] = [];
+    containerRef.current?.querySelectorAll<SVGGElement>("g.vf-keysignature").forEach((g) => {
+      const r = g.getBoundingClientRect();
+      if (!r.width || !r.height) return;
+      const { system, staff } = rowOf((r.top + r.bottom) / 2 - wr.top);
+      zones.push({
+        el: g,
+        x0: r.left - wr.left - 5,
+        x1: r.right - wr.left + 5,
+        y0: r.top - wr.top - 6,
+        y1: r.bottom - wr.top + 6,
+        system,
+        staff,
+        measure: firstMeasureAfter(system, r.right - wr.left),
+        empty: false,
+      });
+    });
+    containerRef.current?.querySelectorAll<SVGGElement>("g.vf-clef").forEach((g) => {
+      const r = g.getBoundingClientRect();
+      if (!r.width || !r.height) return;
+      const { system, staff } = rowOf((r.top + r.bottom) / 2 - wr.top);
+      if (zones.some((z) => z.system === system && z.staff === staff && z.x0 < r.right - wr.left + 40 && z.x1 > r.right - wr.left)) return;
+      const row = staffRows.get(system)?.[staff];
+      if (!row) return;
+      const x = r.right - wr.left;
+      zones.push({ el: null, x0: x + 3, x1: x + 20, y0: row.top - 4, y1: row.bottom + 4, system, staff, measure: firstMeasureAfter(system, x + 20), empty: true });
+    });
+    keyZonesRef.current = zones;
   };
 
   /** The pointer is on the tag or the panel, or the panel is pinned: the hovered note is frozen. */
@@ -438,6 +514,85 @@ export function ScoreView({
     }, TIP_GRACE_MS);
   };
 
+  /** Stop lighting the key signature (halo, tag). */
+  const clearKeyHover = () => {
+    const kh = keyHoverRef.current;
+    if (!kh) return;
+    keyHoverRef.current = null;
+    kh.els.forEach((el) => el.classList.remove("note-halo"));
+    setKeyHover(null);
+  };
+
+  /** Signature (sharps +/flats -) a zone stands for: the signature in force at its measure. */
+  const fifthsForZone = (z: KeyZone): number | null => {
+    const meta = metaRef.current;
+    const m = z.measure ?? 1;
+    return fifthsAtMeasure(meta?.keyChanges ?? [], m, meta?.fifths ?? null);
+  };
+
+  /** Everything the panel needs for the signature in force at a zone: detection runs on the stretch it governs. */
+  const keyViewFor = (z: KeyZone, fifths: number): KeySigView => {
+    const meta = metaRef.current;
+    const all = notesRef.current;
+    const range = measureRangeOf(meta?.keyChanges ?? [], z.measure ?? 1);
+    const part = all.filter((n) => n.measure >= range.from && n.measure <= range.to);
+    const sub = part.length ? part : all;
+    let det: ReturnType<typeof detectKeyFromNotes> | null = null;
+    try {
+      if (sub.length) det = detectKeyFromNotes(sub, fifths);
+    } catch {
+      det = null;
+    }
+    // The Ficha's key (maybe chosen by hand) wins when it matches this signature.
+    const fk = hoverKeyRef.current;
+    const key = fk && fk.fifths === fifths ? fk : (det?.best.key ?? null);
+    const word = key && det && key.id === det.best.key.id ? det.confidenceWord : undefined;
+    return buildKeySigView(fifths, z.staff === 0 ? "treble" : "bass", key, key ? keyEvidence(sub, key) : [], word);
+  };
+
+  /** Tag beside the zone (re-read live so scrolling keeps it attached). */
+  const placeKeyTag = (force: boolean) => {
+    const kh = keyHoverRef.current;
+    const wrap = wrapRef.current;
+    if (!kh || !wrap) return;
+    const wr = wrap.getBoundingClientRect();
+    const left = wr.left + kh.zone.x0;
+    const right = wr.left + kh.zone.x1;
+    const rightEdge = window.innerWidth - rightInsetRef.current;
+    const fitsRight = right + 5 + TIP_NEED_W <= rightEdge;
+    const tagLeft = !fitsRight && left - 5 - TIP_NEED_W >= 0;
+    const x = Math.round(tagLeft ? left - 5 : right + 5);
+    const y = Math.round(wr.top + kh.zone.y0 - 12); // above the staff, so the time signature stays visible
+    setKeyHover((prev) => (prev && !force && prev.tag.x === x && prev.tag.y === y ? prev : prev && { ...prev, tag: { x, y, left: tagLeft } }));
+  };
+
+  const showKeyHover = (z: KeyZone) => {
+    const fifths = fifthsForZone(z);
+    if (fifths === null || (z.empty && fifths !== 0)) return;
+    clearNoteHover();
+    // Light every signature of this system that sits at the same x (both staves).
+    const group = keyZonesRef.current.filter((o) => o.el && o.system === z.system && Math.abs(o.x0 - z.x0) < 6);
+    const els = group.map((o) => o.el!).filter(Boolean);
+    els.forEach((el) => el.classList.add("note-halo"));
+    keyHoverRef.current = { zone: z, els };
+    containerRef.current?.classList.add("in-note-zone");
+    tipRef.current.zone = true;
+    const view = keyViewFor(z, fifths);
+    setKeyHover({ tag: { x: 0, y: 0, left: false }, view });
+    placeKeyTag(true);
+  };
+
+  const openKeyPanel = () => {
+    const kh = keyHoverRef.current;
+    if (!kh) return;
+    const t = tipRef.current;
+    t.over = true;
+    cancelClose();
+    if (t.open) return;
+    t.open = true;
+    setPanelOpen(true);
+  };
+
   /** Stop lighting the hovered note: head, <g>, piano key, tag and panel. */
   const clearNoteHover = () => {
     cancelClose();
@@ -451,6 +606,7 @@ export function ScoreView({
     setPanelCtx(null);
     setPanelScale(null);
     setPanelCloseup(null);
+    clearKeyHover();
     const cur = hoverRef.current;
     if (!cur) return;
     hoverRef.current = null;
@@ -601,7 +757,7 @@ export function ScoreView({
     const t = tipRef.current;
     t.pinned = !t.pinned;
     setPinned(t.pinned);
-    if (t.pinned) openPanel();
+    if (t.pinned) (keyHoverRef.current ? openKeyPanel : openPanel)();
   };
 
   /** Tag position: glued to the notehead (re-read live, so Tocar auto-scroll keeps it attached). */
@@ -633,17 +789,42 @@ export function ScoreView({
     if (tipFrozen()) {
       const cur = hoverRef.current;
       if (cur) placeTooltip(cur.note, false);
+      else if (keyHoverRef.current) placeKeyTag(false);
       return;
     }
     const overlay = [overlayRef, chordSvgRef, hardSvgRef, chordNameSvgRef].some((r) => r.current && target instanceof Node && r.current.contains(target));
     if (!wrap || !idx || overlay || buttons !== 0) return clearNoteHover();
     const wr = wrap.getBoundingClientRect();
-    const hit = nearestNoteHit({ x: cx - wr.left, y: cy - wr.top }, idx);
+    // Key signature first: its zone is the gap between the clef and the first note.
+    const px = cx - wr.left;
+    const py = cy - wr.top;
+    const kz = keyZonesRef.current.find((z) => px >= z.x0 && px <= z.x1 && py >= z.y0 && py <= z.y1);
+    if (kz) {
+      if (keyHoverRef.current?.zone !== kz) {
+        const f = fifthsForZone(kz);
+        if (f === null || (kz.empty && f !== 0)) {
+          // not a real signature spot: fall through to notes
+        } else {
+          showKeyHover(kz);
+          return;
+        }
+      } else {
+        tipRef.current.zone = true;
+        if (!tipRef.current.open) cancelClose();
+        placeKeyTag(false);
+        return;
+      }
+    } else if (keyHoverRef.current) {
+      // Left the signature: keep the tag a moment so the pointer can reach it.
+      tipRef.current.zone = false;
+      scheduleClose();
+    }
+    const hit = nearestNoteHit({ x: px, y: py }, idx);
     const note = hit ? notesRef.current.find((n) => String(n.id) === hit.id) : undefined;
     if (!note) {
       // Left the zone: keep the tag a moment so the pointer can reach it.
       tipRef.current.zone = false;
-      if (hoverRef.current) scheduleClose();
+      if (hoverRef.current || keyHoverRef.current) scheduleClose();
       return;
     }
     if (hoverRef.current?.note.id !== note.id) {
@@ -1525,11 +1706,12 @@ export function ScoreView({
       last = null;
       tipRef.current.zone = false;
       if (tipFrozen()) return;
-      if (hoverRef.current) scheduleClose(); // the pointer may be heading for the tag
+      if (hoverRef.current || keyHoverRef.current) scheduleClose(); // the pointer may be heading for the tag
     };
     const onScroll = () => {
       if (last) queue(); // the score moved under a still pointer
       else if (hoverRef.current) placeTooltip(hoverRef.current.note, false); // frozen on the tag: keep it attached
+      else if (keyHoverRef.current) placeKeyTag(false);
     };
     wrap.addEventListener("pointermove", onMove);
     wrap.addEventListener("pointerleave", onLeave);
@@ -1553,7 +1735,7 @@ export function ScoreView({
     if (!panelOpen || !tag || !panel) return;
     const tr = tag.getBoundingClientRect();
     const w = TIP_PANEL_W + 6;
-    const wantLeft = tooltip?.tag.left ?? false;
+    const wantLeft = tooltip?.tag.left ?? keyHover?.tag.left ?? false;
     const side: "left" | "right" = wantLeft || tr.right + w + 8 > window.innerWidth ? "left" : "right";
     const margin = 8;
     const pr = panel.getBoundingClientRect();
@@ -1904,6 +2086,58 @@ export function ScoreView({
           style={{ left: `${NOW_LINE_FRACTION * 100}%` }}
           aria-hidden
         />
+      )}
+
+      {keyHover && !tooltip && (
+        <div
+          ref={tipRootRef}
+          className="fixed z-50"
+          style={
+            keyHover.tag.left
+              ? { right: document.documentElement.clientWidth - keyHover.tag.x, top: keyHover.tag.y, transform: "translateY(-50%)" }
+              : { left: keyHover.tag.x, top: keyHover.tag.y, transform: "translateY(-50%)" }
+          }
+          onPointerEnter={openKeyPanel}
+          onPointerLeave={leaveTip}
+          data-testid="tip-root"
+          data-kind="key"
+        >
+          <button
+            ref={tipTagRef}
+            type="button"
+            className={`block cursor-pointer whitespace-nowrap rounded-lg border border-border bg-white/95 px-2.5 py-1 text-sm font-semibold text-neutral-900 shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring ${pinned ? "ring-2 ring-foreground/70" : ""}`}
+            aria-expanded={panelOpen}
+            aria-label="Detalles de la armadura"
+            onClick={togglePin}
+            data-testid="tip-tag"
+          >
+            {keyHover.view.tag}
+          </button>
+          {panelOpen && (
+            <div
+              ref={tipPanelRef}
+              className="absolute top-0"
+              style={{
+                [panelPos.side === "right" ? "left" : "right"]: "100%",
+                [panelPos.side === "right" ? "paddingLeft" : "paddingRight"]: 6,
+                transform: `translateY(${panelPos.shiftY}px)`,
+                width: TIP_PANEL_W + 6,
+              }}
+              data-testid="tip-panel"
+              data-side={panelPos.side}
+            >
+              <div
+                className="tip-panel-card flex flex-col rounded-md border border-border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md"
+                style={{ maxHeight: panelPos.maxH }}
+                data-side={panelPos.side}
+              >
+                <div className="min-h-0 flex-1 overflow-y-auto">
+                  <KeyPanel view={keyHover.view} />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
       {tooltip && (

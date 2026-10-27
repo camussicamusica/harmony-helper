@@ -196,3 +196,36 @@ export function buildScaleView(
 }
 
 export { octaveOf };
+
+/**
+ * The scale of a key for the key-signature panel: the notes the signature alters are ringed (so she sees where the
+ * armadura acts); the rest are plain. No passage marking: every note is fully visible.
+ */
+export function buildKeyScaleView(key: KeyInfo, clef: Clef, altered: string[]): ScaleView {
+  const base = clef === "treble" ? 64 : 45;
+  const oct = pickTonicOctave(key.tonic, base);
+  const tonic = `${key.tonic}${oct}`;
+  const scale = Scale.get(`${tonic} ${key.mode === "major" ? "major" : "minor"}`);
+  const names = [...scale.notes, Note.transpose(tonic, "8P")];
+  const steps: ScaleStep[] = names.map((spelled, i) => {
+    const name = splitOct(spelled)[1];
+    return {
+      spelled,
+      midi: Note.midi(spelled) ?? 0,
+      degree: (i % 7) + 1,
+      pc: spelledPitchClass(name),
+      used: true,
+      hovered: altered.includes(name),
+    };
+  });
+  return {
+    clef,
+    keyLabel: key.label,
+    steps,
+    extra: null,
+    hoveredIndex: null,
+    passage: { from: 0, to: 0 },
+    legend: altered.length ? "Con aro: las notas que la armadura altera" : "Sin alteraciones: ninguna nota lleva aro",
+    note: null,
+  };
+}

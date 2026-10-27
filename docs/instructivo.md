@@ -377,6 +377,19 @@ El panel tiene estas secciones, cada una con su título en letras chicas:
 23. Con la línea melódica prendida: poné el mouse sobre un tramo de la línea. Aparece la etiqueta del salto (por ejemplo "5ª J").
 24. La cabeza de la nota (la parte redonda) se enciende con su color de "Colores de las notas", aunque ese color esté apagado. Solo se enciende esa nota, no el resto del acorde ni la plica.
 
+
+### Armadura de clave (los sostenidos o bemoles del principio)
+
+1. Poné el mouse sobre los sostenidos o bemoles que están al principio de un renglón (en cualquiera de los dos pentagramas): se encienden con el borde blanco, igual que una nota, y al lado aparece una etiqueta, por ejemplo "Re mayor · 2 ♯".
+2. Llevá el mouse a la etiqueta: se despliega el panel. Hacé clic en la etiqueta para dejarlo fijo (Esc o clic afuera lo suelta).
+3. **ARMADURA:** las alteraciones dibujadas en su línea, cada una con el color de su nota (siempre, aunque los colores estén apagados en la partitura), y debajo cajitas como "Fa# (F#)" y "Do# (C#)". Tocá una cajita para escuchar esa nota.
+4. **QUÉ TONALIDAD:** por ejemplo "Re mayor, o su relativa Si menor", y qué detectó la app para esta pieza y por qué (termina en la tónica, es la nota que más suena...). Sin alteraciones dice "Do mayor o La menor, sin alteraciones".
+5. **ESCALA:** la escala de la tonalidad detectada en un pentagrama chiquito; las notas que la armadura altera llevan aro.
+6. **TRUCOS:** con sostenidos, "el último sostenido + medio tono = la tónica (Do# → Re)"; con bemoles, "el penúltimo bemol es la tónica" (con un solo bemol, se dice cuál es la tónica). Debajo, el orden de los sostenidos (Fa Do Sol Re La Mi Si) o de los bemoles (Si Mi La Re Sol Do Fa), con los que se usan marcados.
+7. Botones "▶ Escala" (sube a ritmo calmo) y "▶ Acorde de tónica".
+8. Si la partitura cambia de armadura a mitad de pieza, esos sostenidos o bemoles se comportan igual, con la nueva tonalidad.
+9. Con una pieza sin alteraciones, la zona es el espacio entre la clave y lo que sigue.
+
 ---
 
 ## 8. Ficha de la pieza
