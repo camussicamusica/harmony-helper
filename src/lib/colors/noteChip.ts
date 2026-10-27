@@ -1,7 +1,7 @@
 import { Note } from "tonal";
 import { readableTextOn } from "./color";
 
-/** Chip look for one note: her note color, or neutral when that note's color is switched off. */
+/** Chip look for one note: her stored note color (even when it is switched off on the score), neutral only with no color. */
 export interface NoteChipStyle {
   background: string;
   color: string;
@@ -24,11 +24,12 @@ export function spelledPc(spelled: string): number {
   return typeof c === "number" && Number.isFinite(c) ? c : -1;
 }
 
-/** Style of the chip for pitch class `pc`, read from the same note roles the score uses for noteheads. */
+/** Style of the chip for pitch class `pc`: the stored color of its note role. `enabled` is ignored on purpose (it only governs the score). */
 export function noteChipStyle(pc: number, roles: readonly RoleLike[]): NoteChipStyle {
   if (pc < 0) return NEUTRAL_CHIP;
   const r = roles.find((x) => x.id === `note-${pc}`);
-  if (!r || r.enabled === false) return NEUTRAL_CHIP;
+  if (!r || !r.color) return NEUTRAL_CHIP;
+  // "Colores de las notas" (enabled) only controls the score; chips and labels always show the stored color.
   return { background: r.color, color: readableTextOn(r.color), border: "rgba(0,0,0,0.28)", neutral: false };
 }
 

@@ -4,6 +4,10 @@ import { applyStemColors, parseSheetToNotes } from "@/lib/music/parseMusicXml";
 import { activeNotes, getPlaybackSeconds } from "@/lib/music/scheduler";
 import { hoverText, INTERVAL_KEY_LABEL, solfegeName } from "@/lib/music/naming";
 import { noteContext, type NoteContext } from "@/lib/music/analysis/noteContext";
+import { buildScaleView, type ScaleView } from "@/lib/music/analysis/scaleView";
+import { ScaleInKey } from "./ScaleInKey";
+import { labelWidth, layoutLabels } from "@/lib/music/analysis/chordNames";
+import { playChordMidi } from "@/lib/music/analysis/audio";
 import { detectKeyFromNotes, type KeyInfo } from "@/lib/music/analysis/key";
 import { buildGeometry } from "@/lib/music/melodicLine";
 import { pitchClassColor } from "@/lib/music/midiUtils";
@@ -77,6 +81,8 @@ interface Props {
   patternLayer?: PatternLayerView | null;
   /** "Degradé de notas": soft band behind each staff. null/undefined = layer off. */
   degradeLayer?: { intensity: number } | null;
+  /** "Nombres de acordes": written chord names above the top staff. index = position in `chordMarks`. null = layer off. */
+  chordNames?: { items: Array<{ index: number; text: string; outOfKey: boolean; reason: string }> } | null;
   /** Reports the strongest intensity that keeps black noteheads at 4.5:1 for the current notes. */
   onDegradeCap?: (cap: number) => void;
   /** Key of the piece (detected or chosen in the Ficha) for the hover panel; null = the panel detects it itself. */
@@ -157,6 +163,7 @@ export function ScoreView({
   focusMeasure = null,
   patternLayer = null,
   degradeLayer = null,
+  chordNames = null,
   onDegradeCap,
   hoverKey = null,
 }: Props) {
@@ -168,6 +175,7 @@ export function ScoreView({
   const hardSvgRef = useRef<SVGSVGElement | null>(null);
   const patternSvgRef = useRef<SVGSVGElement | null>(null);
   const degradeSvgRef = useRef<SVGSVGElement | null>(null);
+  const chordNameSvgRef = useRef<SVGSVGElement | null>(null);
   const osmdRef = useRef<any>(null);
   const readyRef = useRef(false);
   const cleanupRef = useRef<Array<() => void>>([]);
@@ -208,6 +216,8 @@ export function ScoreView({
   onToggleHardRef.current = onToggleHardMeasure;
   const patternLayerRef = useRef(patternLayer);
   patternLayerRef.current = patternLayer;
+  const chordNamesRef = useRef(chordNames);
+  chordNamesRef.current = chordNames;
   const degradeLayerRef = useRef(degradeLayer);
   degradeLayerRef.current = degradeLayer;
   const onDegradeCapRef = useRef(onDegradeCap);
@@ -236,6 +246,7 @@ export function ScoreView({
   const [panelOpen, setPanelOpen] = useState(false);
   const [pinned, setPinned] = useState(false);
   const [panelCtx, setPanelCtx] = useState<NoteContext | null>(null);
+  const [panelScale, setPanelScale] = useState<ScaleView | null>(null);
   /** Cropped, enlarged copy of the printed score around the hovered note (the "photo" at the top of the panel). */
   const [panelCloseup, setPanelCloseup] = useState<SVGSVGElement | null>(null);
   const [panelPos, setPanelPos] = useState<{ side: "left" | "right"; shiftY: number; maxH: number }>({ side: "right", shiftY: 0, maxH: 600 });
@@ -438,6 +449,7 @@ export function ScoreView({
     setPanelOpen(false);
     setPinned(false);
     setPanelCtx(null);
+    setPanelScale(null);
     setPanelCloseup(null);
     const cur = hoverRef.current;
     if (!cur) return;
@@ -575,6 +587,7 @@ export function ScoreView({
     const live = notesRef.current.find((n) => n.id === cur.note.id) ?? cur.note;
     setPanelCtx(noteContext(live, notesRef.current, key, chords));
     setPanelCloseup(buildCloseup(live));
+    setPanelScale(key ? buildScaleView(live, key, notesRef.current) : null);
     setTipMore(readTipMore());
     setPanelOpen(true);
   };
@@ -622,7 +635,7 @@ export function ScoreView({
       if (cur) placeTooltip(cur.note, false);
       return;
     }
-    const overlay = [overlayRef, chordSvgRef, hardSvgRef].some((r) => r.current && target instanceof Node && r.current.contains(target));
+    const overlay = [overlayRef, chordSvgRef, hardSvgRef, chordNameSvgRef].some((r) => r.current && target instanceof Node && r.current.contains(target));
     if (!wrap || !idx || overlay || buttons !== 0) return clearNoteHover();
     const wr = wrap.getBoundingClientRect();
     const hit = nearestNoteHit({ x: cx - wr.left, y: cy - wr.top }, idx);
@@ -777,6 +790,81 @@ export function ScoreView({
       });
     }
     return out;
+  };
+
+  /**
+   * "Nombres de acordes": the chord symbol (Spanish name · degree) as small muted text above the top staff of the
+   * system, at the chord's first notehead, above the pattern boxes. Two rows to avoid collisions; a label that fits on
+   * neither is skipped. Out-of-key chords get "fuera" and a dashed underline. Clicking a label plays the chord.
+   */
+  const drawChordNames = () => {
+    const svg = chordNameSvgRef.current;
+    const wrap = wrapRef.current;
+    if (!svg || !wrap) return;
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    svg.setAttribute("width", String(wrap.offsetWidth));
+    svg.setAttribute("height", String(wrap.offsetHeight));
+    const layer = chordNamesRef.current;
+    if (!layer || !layer.items.length) return;
+    const marks = chordMarksRef.current;
+    const byId = new Map(notesRef.current.map((n) => [n.id, n]));
+    const cands: Array<{ id: number; system: number; x: number; width: number; item: (typeof layer.items)[number]; midis: number[]; ys: number[] }> = [];
+    for (const item of layer.items) {
+      const chord = marks[item.index];
+      if (!chord) continue;
+      const ns = chord.noteIds.map((id) => byId.get(id)).filter((n): n is ScheduledNote => !!n && n.cx !== undefined && n.cy !== undefined);
+      if (!ns.length) continue;
+      const system = ns[0].system ?? 0;
+      const inSys = ns.filter((n) => (n.system ?? 0) === system);
+      cands.push({
+        id: item.index,
+        system,
+        x: Math.min(...inSys.map((n) => n.cx!)) - 6,
+        width: labelWidth(item.text),
+        item,
+        midis: [...new Set(ns.map((n) => n.midi))].sort((a, b) => a - b),
+        ys: inSys.map((n) => n.cy!),
+      });
+    }
+    const { rows } = layoutLabels(cands.map(({ id, system, x, width }) => ({ id, system, x, width })));
+    for (const c of cands) {
+      const row = rows.get(c.id);
+      if (row === undefined) continue;
+      const top = systemTopRef.current.get(c.system) ?? Math.min(...c.ys) - 30;
+      const y = top - 18 - row * 13;
+      const g = svgEl("g", {
+        "pointer-events": "all",
+        cursor: "pointer",
+        "data-chord-name": c.item.text,
+        "data-reason": c.item.reason,
+        "data-row": row,
+      });
+      g.appendChild(svgEl("rect", { x: c.x - 2, y: y - 11, width: c.width + 4, height: 15, fill: "transparent" }));
+      const t = svgEl("text", {
+        x: c.x,
+        y,
+        "font-size": 11,
+        "font-weight": 500,
+        fill: "#6b7280",
+        stroke: "#ffffff",
+        "stroke-width": 3,
+        "stroke-linejoin": "round",
+        "paint-order": "stroke",
+      });
+      t.textContent = c.item.text;
+      g.appendChild(t);
+      if (c.item.outOfKey) {
+        g.appendChild(svgEl("line", { x1: c.x, x2: c.x + c.width, y1: y + 2.5, y2: y + 2.5, stroke: "#6b7280", "stroke-width": 1, "stroke-dasharray": "2.5 2" }));
+      }
+      const title = svgEl("title", {});
+      title.textContent = "Tocar este acorde";
+      g.appendChild(title);
+      g.addEventListener("click", (e) => {
+        e.stopPropagation();
+        void playChordMidi(c.midis);
+      });
+      svg.appendChild(g);
+    }
   };
 
   /** "Marcar compás difícil": amber boxes over the marked measures (and a pulse on the selected one). */
@@ -1297,6 +1385,7 @@ export function ScoreView({
     drawLine();
     drawChords();
     drawHard();
+    drawChordNames();
   };
 
   /** Render OSMD. In Tocar the zoom is fitted to the band height (zoom slider multiplies on top). */
@@ -1335,6 +1424,7 @@ export function ScoreView({
     drawLine();
     drawChords();
     drawHard();
+    drawChordNames();
     notesOut(notes);
     try {
       const meta = readScoreMeta(osmd, bpmRef.current);
@@ -1620,6 +1710,7 @@ export function ScoreView({
       drawDegrade();
       drawChords();
       drawHard();
+      drawChordNames();
     } catch (e) {
       console.error("BPM recompute failed:", e);
     }
@@ -1652,6 +1743,11 @@ export function ScoreView({
     drawDegrade();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [degradeLayer]);
+  // Chord names — redraw when the layer, its mode or the detected chords change.
+  useEffect(() => {
+    drawChordNames();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chordNames, chordMarks]);
   // Hard measures / selected measure — redraw the amber boxes.
   useEffect(() => {
     drawHard();
@@ -1796,6 +1892,7 @@ export function ScoreView({
           <svg ref={overlayRef} className="pointer-events-none absolute left-0 top-0" />
           <svg ref={chordSvgRef} className="pointer-events-none absolute left-0 top-0" />
           <svg ref={hardSvgRef} className="pointer-events-none absolute left-0 top-0" />
+          <svg ref={chordNameSvgRef} className="pointer-events-none absolute left-0 top-0" aria-label="Nombres de acordes" />
         </div>
       </div>
 
@@ -1854,6 +1951,7 @@ export function ScoreView({
                 <NotePanel
                   tooltip={tooltip}
                   ctx={panelCtx}
+                  scale={panelScale}
                   closeup={panelCloseup}
                   more={tipMore}
                   onMore={(v) => {
@@ -1939,12 +2037,14 @@ function MoreSection({ title, open, testId, children }: { title: string; open: b
 function NotePanel({
   tooltip,
   ctx,
+  scale,
   closeup,
   more,
   onMore,
 }: {
   tooltip: TooltipState;
   ctx: NoteContext;
+  scale: ScaleView | null;
   closeup: SVGSVGElement | null;
   more: boolean;
   onMore: (open: boolean) => void;
@@ -1981,6 +2081,7 @@ function NotePanel({
         {keyRole && (
           <PanelSection title="En la tonalidad" testId="tip-key">
             <div className="text-[11px] font-medium">{keyRole.text}</div>
+            {scale && <ScaleInKey view={scale} />}
           </PanelSection>
         )}
 

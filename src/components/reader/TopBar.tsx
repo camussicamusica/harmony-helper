@@ -10,8 +10,8 @@ import { LINE_MODES, type LineColorMode } from "@/lib/music/lineMode";
 import { UploadZone } from "./UploadZone";
 import { MidiControl } from "./MidiControl";
 import { useLayersOpen } from "@/lib/music/analysis/useFicha";
-import type { DegradeLayer, PatternLayer } from "@/lib/music/analysis/usePatternLayer";
-import { DegradeControls, PatternsControls } from "./LayerControls";
+import type { ChordNamesLayer, DegradeLayer, PatternLayer } from "@/lib/music/analysis/usePatternLayer";
+import { ChordNamesControls, DegradeControls, PatternsControls } from "./LayerControls";
 import { ChevronDown, ChevronUp, Layers, ListMusic, Minus, Pause, Play, Plus, Route, Square } from "lucide-react";
 
 interface Props {
@@ -45,6 +45,7 @@ interface Props {
   onScoreLoaded: (musicXml: string, filename: string) => void;
   patternLayer: PatternLayer;
   degradeLayer: DegradeLayer;
+  chordNamesLayer: ChordNamesLayer;
   /** Strongest degradé intensity that keeps black noteheads readable (0-1). */
   degradeCap: number;
   /** The score has been read: "no repeated measures" is then a fact. */
@@ -82,6 +83,7 @@ export function TopBar({
   onScoreLoaded,
   patternLayer,
   degradeLayer,
+  chordNamesLayer,
   degradeCap,
   scoreReady,
 }: Props) {
@@ -268,7 +270,7 @@ export function TopBar({
           className="h-7 gap-1 px-2 text-xs"
           aria-expanded={layersOpen}
           onClick={() => setLayersOpen(!layersOpen)}
-          title="Cajas de patrones, degradé de notas, color de la línea, etiquetas y saltos"
+          title="Cajas de patrones, degradé de notas, nombres de acordes, color de la línea, etiquetas y saltos"
         >
           <Layers className="h-3.5 w-3.5" /> Capas
           <ChevronDown className={`h-3 w-3 transition-transform ${layersOpen ? "rotate-180" : ""}`} />
@@ -280,6 +282,7 @@ export function TopBar({
         <div className="flex basis-full flex-wrap items-center gap-x-4 gap-y-1.5">
         <PatternsControls layer={patternLayer} scoreReady={scoreReady} />
         <DegradeControls layer={degradeLayer} cap={degradeCap} />
+        <ChordNamesControls layer={chordNamesLayer} />
         <div className="basis-full" aria-hidden />
         {line && (
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">

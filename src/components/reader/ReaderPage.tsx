@@ -15,7 +15,9 @@ import {
 } from "@/lib/music/analysis/useFicha";
 import { useOccurrenceCursor } from "@/lib/music/analysis/useOccurrenceCursor";
 import type { ChordOccurrence } from "@/lib/music/analysis/occurrences";
-import { useDegradeLayer, usePatternLayer } from "@/lib/music/analysis/usePatternLayer";
+import { boxedMeasures, chordLabelText, selectChordLabels } from "@/lib/music/analysis/chordNames";
+import { detectPatterns } from "@/lib/music/analysis/patterns";
+import { useChordNamesLayer, useDegradeLayer, usePatternLayer } from "@/lib/music/analysis/usePatternLayer";
 import type { ScoreMeta } from "@/lib/music/analysis/scoreMeta";
 import { SAMPLE_MUSICXML } from "@/lib/music/sampleScore";
 import {
@@ -126,7 +128,8 @@ export function ReaderPage() {
   const scoreHashRef = useRef(scoreHash);
   scoreHashRef.current = scoreHash;
   const recorrido = useRecorrido(scoreHash);
-  const ficha = useFicha(xml, scoreData, bpm, fichaOpen || recorridoOpen);
+  const chordNamesLayer = useChordNamesLayer();
+  const ficha = useFicha(xml, scoreData, bpm, fichaOpen || recorridoOpen || chordNamesLayer.options.on);
   const patternLayer = usePatternLayer(scoreHash, scoreData);
   const degradeLayer = useDegradeLayer();
   const [degradeCap, setDegradeCap] = useState(1);
@@ -147,6 +150,33 @@ export function ReaderPage() {
     () => (degradeLayer.options.on ? { intensity: degradeLayer.options.intensity } : null),
     [degradeLayer.options.on, degradeLayer.options.intensity],
   );
+  // "Nombres de acordes": which chords get a name. "Solo los únicos" needs the pattern boxes even when that layer is off.
+  const chordNamesView = useMemo(() => {
+    const o = chordNamesLayer.options;
+    if (!o.on || !ficha.chords.length) return null;
+    let boxed = new Set<number>();
+    if (o.mode === "unicos") {
+      const pats =
+        patternLayer.options.on && patternLayer.patterns.length
+          ? patternLayer.patterns
+          : scoreData?.notes.length
+            ? detectPatterns(scoreData.notes, {
+                scope: patternLayer.options.scope,
+                includeTransposed: patternLayer.options.includeTransposed,
+                measureStarts: new Map(scoreData.meta.measures.map((m) => [m.number, m.startSec])),
+              })
+            : [];
+      boxed = boxedMeasures(pats);
+    }
+    return {
+      items: selectChordLabels(ficha.chords, boxed, o.mode).map((p) => ({
+        index: p.index,
+        reason: p.reason,
+        text: chordLabelText(ficha.chords[p.index]),
+        outOfKey: !ficha.chords[p.index].inScale,
+      })),
+    };
+  }, [chordNamesLayer.options, ficha.chords, patternLayer.options, patternLayer.patterns, scoreData]);
   const cursor = useOccurrenceCursor(
     ficha.chords,
     useCallback((occ: ChordOccurrence) => setFocusChord({ index: occ.index, nonce: Date.now() }), []),
@@ -407,6 +437,7 @@ export function ReaderPage() {
         onScoreLoaded={handleScoreLoaded}
         patternLayer={patternLayer}
         degradeLayer={degradeLayer}
+        chordNamesLayer={chordNamesLayer}
         degradeCap={degradeCap}
         scoreReady={scoreData !== null}
       />
@@ -438,6 +469,7 @@ export function ReaderPage() {
               focusMeasure={focusMeasure}
               patternLayer={patternView}
               degradeLayer={degradeView}
+              chordNames={chordNamesView}
               onDegradeCap={setDegradeCap}
               hoverKey={ficha.key}
             />

@@ -319,6 +319,18 @@ Partitura de prueba: `public/prototipos/patrones-ejemplo.musicxml`. En la barra,
 6. "Intensidad": empieza en 35%. Si un color es muy oscuro, la app baja sola la intensidad y avisa "Se muestra al X% para que las notas negras se lean bien."
 7. Se puede usar junto con las cajas de patrones, la línea melódica y los acordes. Cada capa se apaga sola con su interruptor.
 
+
+### Nombres de acordes
+
+1. En la fila "Capas", prendé "Nombres de acordes". Empieza apagado.
+2. Aparece, arriba del pentagrama de cada renglón y por encima de las cajas de patrones, el nombre del acorde en letra chica y gris, como en un cifrado de partitura: por ejemplo "Sol maj7 · IV" (nombre y grado en la tonalidad).
+3. Si el acorde no es de la tonalidad, dice "fuera" (por ejemplo "La menor · fuera") y lleva una línea de rayitas debajo.
+4. "Solo los únicos" (por defecto): nombra un acorde si es el único de su tipo en toda la pieza, O si su compás no está dentro de ninguna caja de patrones. Los que se repiten dentro de una caja no llevan nombre: la letra de la caja ya dice que son repetidos. Funciona aunque "Cajas de patrones" esté apagado.
+5. "Todos": nombra todos los acordes detectados.
+6. Si dos nombres se pisarían, el segundo sube a una segunda fila; si tampoco entra, se omite.
+7. Hacé clic en un nombre para escuchar el acorde.
+8. Se redibuja solo al cambiar el zoom, el tamaño de la ventana o la vista, y queda recordado (también el modo).
+
 ---
 
 ## 7. Hover
@@ -345,6 +357,14 @@ El panel tiene estas secciones, cada una con su título en letras chicas:
 13. **EN LA TONALIDAD:** el grado de la nota en la tonalidad de la pieza, con su nombre. Por ejemplo: "4.º grado de Re mayor · subdominante". Los nombres son: tónica, supertónica, mediante, subdominante, dominante, superdominante y sensible (en menor, el 7.º grado natural se llama subtónica).
 14. Si la nota no es de la escala, dice "fuera de la escala de Re mayor" y, si se puede, qué cambió: "alteración: Do# en vez de Do". En menor, el 7.º elevado se marca como "sensible (7.º grado elevado)".
 15. La tonalidad es la de la Ficha. Si la elegiste a mano en la Ficha, usa esa. Con la Ficha cerrada, la app la detecta sola.
+15b. **La escala en un pentagrama chiquito** (debajo de esa línea, siempre visible): la escala completa de la tonalidad, de tónica a tónica (8 notas), en la clave de la mano de tu nota (sol para la derecha, fa para la izquierda) y en la octava que queda cerca de tu nota. Las alteraciones se escriben delante de cada nota (no hay armadura).
+15c. Cada nota de la escala lleva TU color de esa nota, aunque los colores estén apagados en la partitura. Si una nota no tiene color, se dibuja en negro.
+15d. Tu nota va con un aro y un poco más grande, y abajo dice su grado ("7.º"). Las demás llevan solo el número del grado (1 a 7).
+15e. **Lo que está usando la canción:** las notas de la escala que suenan en el compás de tu nota, el anterior y el siguiente se ven enteras; las demás se ven pálidas (35%). Abajo dice, por ejemplo: "En color: las que suenan en este pasaje (compases 3–5)".
+15f. En menor se usa la menor natural. Si tu nota es el 7.º elevado, se dibuja ese en su lugar y dice "(sensible elevada, menor armónica)".
+15g. Si tu nota no es de la escala (por ejemplo un Do natural en Re mayor), se dibuja la escala y tu nota aparece como una cabeza extra, con aro de rayitas, justo al lado del grado que cambia (el Do#), con su alteración y el texto "alterada: Do en vez de Do#".
+15h. Hacé clic en cualquier nota del pentagrama para escucharla (o Tab hasta ella y Enter). Al pasar el mouse se marca la columna.
+15i. La etiqueta de color que sigue a la nota, y todas las cajitas de color del panel, usan siempre el color guardado de esa nota, aunque en la partitura los colores estén apagados. Lo mismo pasa con las cajitas de la Ficha y del círculo de acordes: "Colores de las notas" solo apaga los colores de la partitura.
 16. **Más ▸:** por defecto ves la foto, NOTA, SU FIGURA y EN LA TONALIDAD. Tocá "Más" para abrir ARMONÍA, SUENAN AHORA y MELODÍA (queda recordado). Si el panel no entra en la pantalla, la foto no se mueve: baja solo la parte de abajo.
 16b. **ARMONÍA:** el acorde que suena en ese momento (el de "Acordes de la pieza" de la Ficha; si no hay, el que forman las notas que suenan juntas), con una cajita de color por cada nota del acorde y la tuya marcada con borde grueso. Es la armonía, no lo que está impreso junto a tu nota.
 17. Debajo dice qué es tu nota dentro del acorde: fundamental, tercera, quinta, séptima, novena, o "nota de paso / no es del acorde".

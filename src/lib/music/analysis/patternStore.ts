@@ -13,6 +13,7 @@ export const PROTO_PALETTES_KEY = "hh.proto.patternPalettes.v1";
 export const PROTO_IMPORTED_KEY = "hh.patterns.protoImported.v1";
 export const OPTIONS_KEY = "hh.patterns.options.v1";
 export const DEGRADE_KEY = "hh.degrade.v1";
+export const CHORD_NAMES_KEY = "hh.chordNames.v1";
 
 export function browserStorage(): KV | null {
   try {
@@ -212,4 +213,23 @@ export function loadDegradeOptions(kv: KV | null = browserStorage()): DegradeOpt
 
 export function saveDegradeOptions(o: DegradeOptions, kv: KV | null = browserStorage()) {
   writeJson(kv, DEGRADE_KEY, o);
+}
+
+/** "Nombres de acordes": which chords get a written name above the staff. */
+export type ChordNamesMode = "unicos" | "todos";
+
+export interface ChordNamesOptions {
+  on: boolean;
+  mode: ChordNamesMode;
+}
+
+export const DEFAULT_CHORD_NAMES_OPTIONS: ChordNamesOptions = { on: false, mode: "unicos" };
+
+export function loadChordNamesOptions(kv: KV | null = browserStorage()): ChordNamesOptions {
+  const v = readJson<Partial<ChordNamesOptions>>(kv, CHORD_NAMES_KEY, {});
+  return { on: v.on === true, mode: v.mode === "todos" ? "todos" : "unicos" };
+}
+
+export function saveChordNamesOptions(o: ChordNamesOptions, kv: KV | null = browserStorage()) {
+  writeJson(kv, CHORD_NAMES_KEY, o);
 }

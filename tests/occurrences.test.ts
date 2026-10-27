@@ -74,8 +74,11 @@ describe("noteChipStyle", () => {
     expect(s.color).toBe("#111111"); // light yellow -> dark text
     expect(noteChipStyle(9, roles).color).toBe("#ffffff"); // dark blue -> white text
   });
-  test("disabled or missing role is neutral", () => {
-    expect(noteChipStyle(7, roles)).toEqual(NEUTRAL_CHIP);
+  test("a disabled role keeps its stored color (enabled only governs the score)", () => {
+    expect(noteChipStyle(7, roles).background).toBe("#1E5FBF");
+    expect(noteChipStyle(7, roles).neutral).toBe(false);
+  });
+  test("missing role or no pitch is neutral", () => {
     expect(noteChipStyle(5, roles)).toEqual(NEUTRAL_CHIP);
     expect(noteChipStyle(-1, roles)).toEqual(NEUTRAL_CHIP);
   });

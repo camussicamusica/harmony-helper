@@ -14,7 +14,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import type { DegradeLayer, PatternLayer } from "@/lib/music/analysis/usePatternLayer";
+import type { ChordNamesLayer, DegradeLayer, PatternLayer } from "@/lib/music/analysis/usePatternLayer";
 import type { PatternScope } from "@/lib/music/analysis/patterns";
 
 const SCOPES: Array<{ id: PatternScope; label: string }> = [
@@ -208,6 +208,41 @@ export function DegradeControls({ layer, cap }: { layer: DegradeLayer; cap: numb
         <span className="text-xs italic text-muted-foreground" role="status">
           Se muestra al {pct(cap)} para que las notas negras se lean bien.
         </span>
+      )}
+    </div>
+  );
+}
+
+const CHORD_NAME_MODES: Array<{ id: "unicos" | "todos"; label: string }> = [
+  { id: "unicos", label: "Solo los únicos" },
+  { id: "todos", label: "Todos" },
+];
+
+/** Switch "Nombres de acordes" plus its two modes. */
+export function ChordNamesControls({ layer }: { layer: ChordNamesLayer }) {
+  const { options, setOptions } = layer;
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+      <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+        <Switch checked={options.on} onCheckedChange={(v) => setOptions({ on: v })} aria-label="Nombres de acordes" />
+        <span className={options.on ? "italic text-foreground" : ""}>Nombres de acordes</span>
+      </label>
+      {options.on && (
+        <div className="flex items-center gap-0.5 rounded-md border border-border p-0.5" role="group" aria-label="Qué acordes nombrar">
+          {CHORD_NAME_MODES.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              aria-pressed={options.mode === m.id}
+              onClick={() => setOptions({ mode: m.id })}
+              className={`rounded px-2 py-0.5 text-xs ${
+                options.mode === m.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
       )}
     </div>
   );

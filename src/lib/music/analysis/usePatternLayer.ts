@@ -3,7 +3,11 @@ import type { ScoreData } from "./useFicha";
 import { colorCount, detectPatterns, patternLetters, type Pattern } from "./patterns";
 import {
   applyPaletteToScore,
+  DEFAULT_CHORD_NAMES_OPTIONS,
   DEFAULT_DEGRADE_OPTIONS,
+  loadChordNamesOptions,
+  saveChordNamesOptions,
+  type ChordNamesOptions,
   DEFAULT_PATTERN_OPTIONS,
   getScoreColors,
   importProtoPalettes,
@@ -130,6 +134,27 @@ export function useDegradeLayer(): DegradeLayer {
     setOptionsState((prev) => {
       const next = { ...prev, ...patch };
       saveDegradeOptions(next);
+      return next;
+    });
+  }, []);
+  return { options, setOptions };
+}
+
+export interface ChordNamesLayer {
+  options: ChordNamesOptions;
+  setOptions: (patch: Partial<ChordNamesOptions>) => void;
+}
+
+/** "Nombres de acordes" switch + mode, remembered in localStorage (hh.chordNames.v1). */
+export function useChordNamesLayer(): ChordNamesLayer {
+  const [options, setOptionsState] = useState<ChordNamesOptions>(DEFAULT_CHORD_NAMES_OPTIONS);
+  useEffect(() => {
+    setOptionsState(loadChordNamesOptions());
+  }, []);
+  const setOptions = useCallback((patch: Partial<ChordNamesOptions>) => {
+    setOptionsState((prev) => {
+      const next = { ...prev, ...patch };
+      saveChordNamesOptions(next);
       return next;
     });
   }, []);
