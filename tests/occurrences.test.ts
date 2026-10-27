@@ -115,3 +115,70 @@ describe("every chord tone gets her color (default roles, all enabled)", () => {
     });
   }
 });
+
+import { durationNameFor, intervalNameEs } from "../src/lib/music/naming";
+import { headHoverStyle } from "../src/lib/colors/noteChip";
+
+describe("durationNameFor (dots)", () => {
+  test("plain, dotted and double dotted for every base", () => {
+    const bases: Array<[number, string]> = [[1, "redonda"], [1 / 2, "blanca"], [1 / 4, "negra"], [1 / 8, "corchea"], [1 / 16, "semicorchea"]];
+    for (const [b, name] of bases) {
+      expect(durationNameFor(b, b)).toBe(name);
+      expect(durationNameFor(b, b * 1.5)).toBe(`${name} con puntillo`);
+      expect(durationNameFor(b, b * 1.75)).toBe(`${name} con doble puntillo`);
+    }
+  });
+  test("tuplets keep the plain name; no type falls back to length", () => {
+    expect(durationNameFor(1 / 4, 1 / 6)).toBe("negra");
+    expect(durationNameFor(undefined, 0.75)).toBe("blanca con puntillo");
+  });
+});
+
+describe("intervalNameEs", () => {
+  test("Spanish names", () => {
+    expect(intervalNameEs("B", "F#")).toBe("quinta justa");
+    expect(intervalNameEs("C", "E")).toBe("tercera mayor");
+    expect(intervalNameEs("C", "Eb")).toBe("tercera menor");
+    expect(intervalNameEs("C", "F#")).toBe("cuarta aumentada");
+    expect(intervalNameEs("C", "Gb")).toBe("quinta disminuida");
+  });
+  test("two sounding notes carry the interval; three do not", () => {
+    const n = (midi: number, s: string): ScheduledNote => ({
+      id: s, midi, noteName: s, spelledName: s, startSec: 0, durationSec: 1, measure: 1, hand: "LH", durationName: "negra",
+    });
+    const two = [n(47, "B"), n(54, "F#")];
+    const h = hoverText(two[0], two);
+    expect(h.chord?.interval).toBe("quinta justa");
+    expect(h.chord?.ownIndex).toBe(0);
+    expect(hoverText(two[1], two).chord?.ownIndex).toBe(1);
+    const three = [n(48, "C"), n(52, "E"), n(55, "G")];
+    expect(hoverText(three[0], three).chord?.interval).toBeNull();
+  });
+});
+
+describe("headHoverStyle", () => {
+  const roles = [
+    { id: "note-2", color: "#F9C81E", enabled: true, targets: ["notehead", "stem"] },
+    { id: "note-7", color: "#1E5FBF", enabled: false, targets: ["notehead"] },
+    { id: "note-9", color: "#aa00aa", enabled: true, targets: ["stem"] },
+  ];
+  test("glow when the head is already colored", () => expect(headHoverStyle(2, roles)).toEqual({ color: "#F9C81E", mode: "glow" }));
+  test("fill when disabled or notehead target off (stored color)", () => {
+    expect(headHoverStyle(7, roles)).toEqual({ color: "#1E5FBF", mode: "fill" });
+    expect(headHoverStyle(9, roles)?.mode).toBe("fill");
+  });
+  test("null when no role", () => {
+    expect(headHoverStyle(5, roles)).toBeNull();
+    expect(headHoverStyle(-1, roles)).toBeNull();
+  });
+});
+
+describe("hoverText location and own note", () => {
+  test("where reads Compás N · tiempo B", () => {
+    const x = { id: "a", midi: 47, noteName: "B", spelledName: "B", startSec: 0, durationSec: 1, measure: 18, beat: 1, hand: "LH", durationName: "blanca con puntillo" } as ScheduledNote;
+    const h = hoverText(x, [x]);
+    expect(h.where).toBe("Compás 18 · tiempo 1");
+    expect(h.own).toEqual({ spelled: "B", duration: "blanca con puntillo" });
+    expect(h.chord).toBeNull();
+  });
+});

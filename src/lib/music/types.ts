@@ -28,6 +28,10 @@ export interface ScheduledNote {
   cy?: number;
   /** SVG <g> elements for the notehead(s) of this note in the rendered score. */
   svgEls?: SVGGElement[];
+  /** Beat within the measure (1-based, whole beats), when the score gives it. */
+  beat?: number;
+  /** The round notehead <path> of this note alone (a chord mate has its own). Set after render. */
+  headEl?: SVGElement;
   /** SVG elements for the accidental glyph(s) attached to this note, if any. */
   accidentalEls?: SVGElement[];
 }

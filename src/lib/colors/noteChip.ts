@@ -31,3 +31,22 @@ export function noteChipStyle(pc: number, roles: readonly RoleLike[]): NoteChipS
   if (!r || r.enabled === false) return NEUTRAL_CHIP;
   return { background: r.color, color: readableTextOn(r.color), border: "rgba(0,0,0,0.28)", neutral: false };
 }
+
+export type HeadHover = { color: string; mode: "fill" | "glow" };
+
+/**
+ * What hovering a notehead of pitch class `pc` should do.
+ * "glow": the head is already painted in her color (role on and its notehead target on), so add a highlight.
+ * "fill": the color is not shown on the head (role off or notehead target off), so paint it while hovered.
+ * null: that pitch has no role color at all.
+ */
+export function headHoverStyle(
+  pc: number,
+  roles: readonly (RoleLike & { targets?: readonly string[] })[],
+): HeadHover | null {
+  if (pc < 0) return null;
+  const r = roles.find((x) => x.id === `note-${pc}`);
+  if (!r || !r.color) return null;
+  const shown = r.enabled !== false && (!r.targets || r.targets.includes("notehead"));
+  return { color: r.color, mode: shown ? "glow" : "fill" };
+}

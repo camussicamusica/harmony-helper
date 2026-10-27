@@ -1,4 +1,4 @@
-import { Chord } from "tonal";
+import { Chord, Interval } from "tonal";
 import type { ScheduledNote } from "./types";
 
 const SOLFEGE: Record<string, string> = {
@@ -60,6 +60,34 @@ export function durationNameFromWhole(len: number): string {
     }
   }
   return best;
+}
+
+/**
+ * Duration name from the plain note type (`typeLen`, no dots) and the real length (`len`, with dots).
+ * "blanca" for 1/2 and 1/2; "blanca con puntillo" for 1/2 and 3/4; "... con doble puntillo" for 7/8.
+ * Tuplets (ratio not 1, 1.5 or 1.75) keep the plain type name.
+ */
+export function durationNameFor(typeLen: number | undefined, len: number): string {
+  if (!typeLen || typeLen <= 0) return durationNameFromWhole(len);
+  const r = len / typeLen;
+  if (Math.abs(r - 1.75) < 0.02) return durationNameFromWhole(typeLen * 1.75);
+  if (Math.abs(r - 1.5) < 0.02) return durationNameFromWhole(typeLen * 1.5);
+  return durationNameFromWhole(typeLen);
+}
+
+const INTERVAL_NUM_ES: Record<number, string> = {
+  1: "unísono", 2: "segunda", 3: "tercera", 4: "cuarta", 5: "quinta", 6: "sexta", 7: "séptima", 8: "octava",
+};
+const INTERVAL_Q_ES: Record<string, string> = { P: "justa", M: "mayor", m: "menor", A: "aumentada", d: "disminuida" };
+
+/** Spanish interval name between two spelled notes without octave, low to high: ("C","G") -> "quinta justa". Null if unknown. */
+export function intervalNameEs(lowSpelled: string, highSpelled: string): string | null {
+  const i = Interval.get(Interval.distance(lowSpelled, highSpelled));
+  if (i.empty || typeof i.num !== "number") return null;
+  const num = INTERVAL_NUM_ES[Math.abs(i.num)];
+  const q = INTERVAL_Q_ES[i.q];
+  if (!num || !q) return null;
+  return `${num} ${q}`;
 }
 
 const INTERVALS = [
@@ -166,10 +194,16 @@ export function soundingAt(note: ScheduledNote, all: ScheduledNote[]): Scheduled
 }
 
 export interface HoverText {
+  /** The hovered note alone: spelled name and duration ("blanca con puntillo"). */
+  own: { spelled: string; duration: string };
+  /** "Compás 18 · tiempo 1" (no beat when unknown). */
+  where: string;
+  measure: number;
+  beat?: number;
   line1: string;
   line2: string | null;
   /** The notes sounding together (spelled, as in line2) so the UI can draw each one as a colored chip. */
-  chord: { name: string | null; tones: string[] } | null;
+  chord: { name: string | null; tones: string[]; ownIndex: number; interval: string | null } | null;
 }
 
 export function hoverText(note: ScheduledNote, all: ScheduledNote[]): HoverText {
@@ -182,7 +216,10 @@ export function hoverText(note: ScheduledNote, all: ScheduledNote[]): HoverText 
     const names = group.map((n) => solfegeName(n.spelledName));
     const chord = chordName(group.map((n) => n.spelledName));
     line2 = chord ? `${chord} · ${names.join(" · ")}` : names.join(" · ");
-    chordInfo = { name: chord, tones: group.map((n) => n.spelledName) };
+    const ownIndex = Math.max(0, group.findIndex((n) => n.midi === note.midi));
+    const interval = group.length === 2 ? intervalNameEs(group[0].spelledName, group[1].spelledName) : null;
+    chordInfo = { name: chord, tones: group.map((n) => n.spelledName), ownIndex, interval };
   }
-  return { line1, line2, chord: chordInfo };
+  const where = `Compás ${note.measure}${note.beat ? ` · tiempo ${note.beat}` : ""}`;
+  return { line1, line2, chord: chordInfo, own: { spelled: note.spelledName, duration: note.durationName }, where, measure: note.measure, beat: note.beat };
 }

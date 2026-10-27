@@ -8,10 +8,14 @@ interface Props {
   /** "full" = "Re (D)"; "short" = "Re" (small spaces). */
   label?: "full" | "short";
   className?: string;
+  /** Index in `spelled` of the note she is on: drawn with a thicker ring and bold. */
+  ownIndex?: number;
+  /** "lg" = the big chip of the note itself. */
+  size?: "sm" | "lg";
 }
 
 /** One chip per chord tone, painted with HER note color (neutral when that note's color is off). */
-export function ChordNoteChips({ spelled, label = "full", className = "" }: Props) {
+export function ChordNoteChips({ spelled, label = "full", className = "", ownIndex, size = "sm" }: Props) {
   const { palette } = useColors(); // repaint when she changes a note color
   return (
     <span className={`inline-flex flex-wrap items-center gap-1 ${className}`} data-testid="chord-chips">
@@ -22,8 +26,13 @@ export function ChordNoteChips({ spelled, label = "full", className = "" }: Prop
             key={`${n}-${i}`}
             data-note={n}
             data-neutral={st.neutral ? "1" : "0"}
-            className="rounded-md px-1.5 py-0.5 text-[11px] font-semibold leading-4"
-            style={{ background: st.background, color: st.color, border: `1.5px solid ${st.border}` }}
+            data-own={i === ownIndex ? "1" : "0"}
+            className={`rounded-md ${size === "lg" ? "px-2.5 py-1 text-sm leading-5" : "px-1.5 py-0.5 text-[11px] leading-4"} ${i === ownIndex ? "font-extrabold" : "font-semibold"}`}
+            style={
+              i === ownIndex
+                ? { background: st.background, color: st.color, border: `1.5px solid ${st.border}`, boxShadow: "0 0 0 2px #111827" }
+                : { background: st.background, color: st.color, border: `1.5px solid ${st.border}` }
+            }
           >
             {label === "full" ? noteLabel(n) : solfegeName(n)}
           </span>

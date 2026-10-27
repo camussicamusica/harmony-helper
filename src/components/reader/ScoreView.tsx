@@ -18,7 +18,8 @@ import type { LineColorMode } from "@/lib/music/lineMode";
 import { IntervalLegend } from "./IntervalLegend";
 import { readScoreMeta, type ScoreMeta } from "@/lib/music/analysis/scoreMeta";
 import type { PieceChord } from "@/lib/music/analysis/pieceChords";
-import { getRole } from "@/lib/colors/store";
+import { getPalette, getRole } from "@/lib/colors/store";
+import { headHoverStyle, spelledPc } from "@/lib/colors/noteChip";
 import { ChordNoteChips } from "@/components/analysis/ChordNoteChips";
 import { intervalRole, intervalSignature, noteSignature, noteTargetOn, subscribe as subscribeColors } from "@/lib/colors/store";
 import type { Hand, IsolationMode, ScheduledNote, ScoreView as ViewMode } from "@/lib/music/types";
@@ -108,8 +109,12 @@ interface TooltipState {
   y: number;
   line1: string;
   line2: string | null;
+  own: { spelled: string; duration: string };
+  where: string;
+  measure: number;
+  beat?: number;
   /** Chord tones (spelled), shown as chips in her note colors. */
-  chord?: { name: string | null; tones: string[] } | null;
+  chord?: { name: string | null; tones: string[]; ownIndex: number; interval: string | null } | null;
 }
 
 export function ScoreView({
@@ -264,13 +269,17 @@ export function ScoreView({
       byEl.set(el, arr);
     }
     for (const [el, group] of byEl) {
-      const headGroup = el.querySelector(".vf-notehead");
-      const heads = headGroup ? Array.from(headGroup.querySelectorAll("path")) : [];
+      // Each chord head is its own .vf-notehead <g> inside the note's <g>.
+      const heads = Array.from(el.querySelectorAll<SVGElement>(".vf-notehead path"));
       let rects: DOMRect[] = heads.map((h) => h.getBoundingClientRect()).filter((r) => r.width || r.height);
       rects = rects.sort((a, b) => a.top - b.top);
       const ranked = [...group].sort((a, b) => b.midi - a.midi);
       const whole = el.getBoundingClientRect();
+      // Same pairing for the head element itself (needed by the per-notehead hover).
+      const headEls = heads.filter((h) => { const b = h.getBoundingClientRect(); return b.width || b.height; })
+        .sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top);
       ranked.forEach((n, i) => {
+        n.headEl = headEls.length === ranked.length ? headEls[i] : headEls.length === 1 ? headEls[0] : undefined;
         const r = rects.length === ranked.length ? rects[i] : rects.length ? rects[0] : whole;
         if (!r.width && !r.height) {
           n.cx = undefined;
@@ -985,9 +994,16 @@ export function ScoreView({
     paintNotes(notes);
     measure(notes);
 
+    // Chord mates share one <g>: for them the bubble listens on the note's own head, so it names the right note.
+    const perG = new Map<Element, number>();
+    for (const n of notes) {
+      const g0 = n.svgEls?.[0];
+      if (g0) perG.set(g0, (perG.get(g0) ?? 0) + 1);
+    }
     for (const note of notes) {
       if (!note.svgEls?.length) continue;
-      for (const el of note.svgEls) {
+      for (const gEl of note.svgEls) {
+        const el: SVGElement = (perG.get(gEl) ?? 0) > 1 && note.headEl ? note.headEl : gEl;
         const show = (ev: MouseEvent) => {
           const live = notesRef.current.find((n) => n.id === note.id) ?? note;
           const txt = hoverText(live, notesRef.current);
@@ -1015,6 +1031,26 @@ export function ScoreView({
           el.removeEventListener("mouseleave", onLeave);
         });
       }
+    }
+
+    // Per-notehead hover: only that head lights up (fill when its color is not shown, glow when it is).
+    for (const note of notes) {
+      const head = note.headEl;
+      if (!head || !head.isConnected) continue;
+      const enter = () => {
+        const hh = headHoverStyle(spelledPc(note.spelledName) >= 0 ? spelledPc(note.spelledName) : note.midi % 12, getPalette().roles);
+        if (!hh) return;
+        head.style.setProperty("--head-color", hh.color);
+        head.classList.add(hh.mode === "fill" ? "head-hover-fill" : "head-hover-glow");
+      };
+      const leave = () => head.classList.remove("head-hover-fill", "head-hover-glow");
+      head.addEventListener("mouseenter", enter);
+      head.addEventListener("mouseleave", leave);
+      cleanupRef.current.push(() => {
+        head.removeEventListener("mouseenter", enter);
+        head.removeEventListener("mouseleave", leave);
+        leave();
+      });
     }
 
     drawPatterns();
@@ -1398,22 +1434,39 @@ export function ScoreView({
 
       {tooltip && (
         <div
-          className="pointer-events-none fixed z-50 whitespace-nowrap rounded-md border border-border bg-popover px-2.5 py-1.5 text-xs text-popover-foreground shadow-md"
+          className="pointer-events-none fixed z-50 max-w-[260px] rounded-md border border-border bg-popover px-2.5 py-1.5 text-xs text-popover-foreground shadow-md"
           style={{
             left: tooltip.x + (tipRight ? -14 : 14),
             top: tooltip.y + 16,
             transform: tipRight ? "translateX(-100%)" : undefined,
           }}
         >
-          <div className="font-medium">{tooltip.line1}</div>
-          {tooltip.chord ? (
-            <div className="mt-1 flex flex-col gap-1" data-testid="chord-tooltip">
-              {tooltip.chord.name && <div className="font-medium">{tooltip.chord.name}</div>}
-              <ChordNoteChips spelled={tooltip.chord.tones} />
-            </div>
-          ) : (
-            tooltip.line2 && <div className="mt-0.5 text-muted-foreground">{tooltip.line2}</div>
-          )}
+          <div className="flex items-baseline gap-2" data-testid="tip-note">
+            <ChordNoteChips spelled={[tooltip.own.spelled]} size="lg" />
+            <span className="text-sm font-medium">{tooltip.own.duration}</span>
+            {tooltip.beat ? <span className="text-[11px] text-muted-foreground">tiempo {tooltip.beat}</span> : null}
+          </div>
+          {/* Small measure: barlines left and right, measure number top-left. */}
+          <div
+            className="relative mt-1.5 rounded-md border-x-2 border-y border-y-border border-x-foreground/80 px-2.5 pb-1.5 pt-4"
+            data-testid="tip-measure"
+          >
+            <span className="absolute left-1.5 top-0.5 text-[10px] leading-3 text-muted-foreground">
+              compás {tooltip.measure}
+            </span>
+            {tooltip.chord && (
+              <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Suenan juntas
+              </div>
+            )}
+            <ChordNoteChips
+              spelled={tooltip.chord ? tooltip.chord.tones : [tooltip.own.spelled]}
+              ownIndex={tooltip.chord ? tooltip.chord.ownIndex : 0}
+            />
+            {tooltip.chord && (tooltip.chord.name || tooltip.chord.interval) && (
+              <div className="mt-1 text-[11px] font-medium">{tooltip.chord.name ?? tooltip.chord.interval}</div>
+            )}
+          </div>
         </div>
       )}
 

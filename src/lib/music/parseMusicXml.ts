@@ -1,7 +1,7 @@
 import type { OpenSheetMusicDisplay } from "opensheetmusicdisplay";
 import type { Hand, ScheduledNote } from "./types";
 import { midiToName } from "./midiUtils";
-import { durationNameFromWhole } from "./naming";
+import { durationNameFor } from "./naming";
 import { markPhrases } from "./melodicLine";
 import { noteColor, noteTargetOn } from "@/lib/colors/store";
 import { PLAIN_COLOR } from "@/lib/colors/defaults";
@@ -149,6 +149,10 @@ export function parseSheetToNotes(osmd: OpenSheetMusicDisplay, bpm = 90): ParseR
               if (aEl) accidentalEls.push(aEl);
             }
 
+            const posInMeasure: number | undefined = src.ParentStaffEntry?.Timestamp?.RealValue;
+            const denom: number | undefined = src.SourceMeasure?.ActiveTimeSignature?.Denominator;
+            const beat =
+              typeof posInMeasure === "number" && denom ? Math.floor(posInMeasure * denom + 1e-6) + 1 : undefined;
             const typeLen = src.TypeLength?.RealValue;
             const slurEnd = (src.NoteSlurs ?? []).some((sl: any) => sl?.EndNote === src);
             const tie = src.NoteTie;
@@ -162,7 +166,8 @@ export function parseSheetToNotes(osmd: OpenSheetMusicDisplay, bpm = 90): ParseR
               durationSec,
               hand,
               measure: src.SourceMeasure?.MeasureNumber ?? 0,
-              durationName: durationNameFromWhole(typeLen && typeLen > 0 ? typeLen : length),
+              beat,
+              durationName: durationNameFor(typeLen, length),
               spelledName: spellPitch(pitch, midi),
               slurEnd,
               tieContinuation,

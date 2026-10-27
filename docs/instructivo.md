@@ -325,9 +325,10 @@ Partitura de prueba: `public/prototipos/patrones-ejemplo.musicxml`. En la barra,
 
 **Hover:** poner el mouse encima de algo, sin hacer clic.
 
-1. Poné el mouse sobre una nota. Aparece un cartelito, por ejemplo: "Sol (G) · corchea · compás 1". Dice nombre de la nota (con la letra en inglés entre paréntesis), duración y número de compás.
-2. Si suenan varias notas juntas (las dos manos), el cartelito agrega una segunda línea con el nombre del acorde, por ejemplo "Fa# menor · Fa# · La · Do#". Si la app no está segura, muestra solo las notas. No adivina.
+1. Poné el mouse sobre una nota. Aparece un cartelito. Arriba, una cajita grande con la nota (por ejemplo "Sol (G)") y al lado la duración ("corchea", "blanca con puntillo") y el tiempo.
+2. Debajo hay un compás chiquito, con barras a los costados y el número de compás arriba a la izquierda. Adentro, una cajita por cada nota que suena junta (las dos manos), con la tuya marcada con borde grueso. Abajo, el nombre del acorde o, si son dos notas, el intervalo ("quinta justa"). Si la app no está segura del acorde, no lo adivina.
 3. Con la línea melódica prendida: poné el mouse sobre un tramo de la línea. Aparece la etiqueta del salto (por ejemplo "5ª J").
+4. La cabeza de la nota (la parte redonda) se enciende con su color de "Colores de las notas", aunque ese color esté apagado. Solo se enciende esa nota, no el resto del acorde ni la plica.
 
 ---
 
@@ -428,7 +429,7 @@ Muestra un acorde a la vez sobre las 12 notas, en círculo.
 ### 8.7 Cajitas de notas al pasar el mouse
 
 1. En la partitura, pasá el mouse sobre una nota que suena junto con otras.
-2. Aparece un globito con el nombre de la nota, el compás y, si son 3 o más notas, el nombre del acorde.
+2. Aparece un globito con la nota, su duración, el compás y, si son 3 o más notas, el nombre del acorde.
 3. Debajo hay una cajita por cada nota del acorde, con tu color. Ejemplo: "Re (D)", "Fa# (F#)", "La (A)", "Do (C)".
 4. Si apagaste el color de esa nota en "Colores", la cajita sale blanca.
 5. Las mismas cajitas aparecen en "Acordes de la escala" y en "Acordes de la pieza" de la Ficha.

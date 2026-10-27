@@ -163,10 +163,21 @@
   transition: filter 120ms ease;
 }
 
-.score-root [data-note-id].note-hover path,
-.score-root [data-note-id].note-hover ellipse,
-.score-root [data-note-id].note-hover rect {
-  fill: var(--note-color, currentColor) !important;
+/* Hovering a note no longer repaints the whole <g> (stem, flag, chord mates): only its own head, below. */
+
+.score-root .vf-notehead path {
+  transition: fill 100ms ease, filter 100ms ease;
+}
+.score-root .vf-notehead path.head-hover-fill {
+  fill: var(--head-color) !important;
+}
+.score-root .vf-notehead path.head-hover-glow {
+  filter: drop-shadow(0 0 2px var(--head-color)) drop-shadow(0 0 4px var(--head-color));
+}
+@media (prefers-reduced-motion: reduce) {
+  .score-root .vf-notehead path {
+    transition: none;
+  }
 }
 
 .score-root [data-note-id].note-playing path,
