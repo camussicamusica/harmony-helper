@@ -110,6 +110,8 @@ interface TooltipState {
   y: number;
   /** Bubble goes under the system's lowest note or over its highest, never on the notes. */
   place: "below" | "above";
+  /** Colored name tag glued to the notehead itself, so name, color and position are seen in one glance. */
+  tag: { x: number; y: number; left: boolean };
   line1: string;
   line2: string | null;
   own: { spelled: string; duration: string };
@@ -434,7 +436,9 @@ export function ScoreView({
     cur.x = x;
     cur.y = y;
     const live = notesRef.current.find((n) => n.id === note.id) ?? note;
-    setTooltip({ x, y, place, ...hoverText(live, notesRef.current) });
+    const tagLeft = r.right + 110 > window.innerWidth;
+    const tag = { x: Math.round(tagLeft ? r.left - 5 : r.right + 5), y: Math.round(r.top + r.height / 2), left: tagLeft };
+    setTooltip({ x, y, place, tag, ...hoverText(live, notesRef.current) });
   };
 
   /** Pointer (client px) -> nearest note zone -> hover. Overlays with their own hit target keep priority. */
@@ -1531,6 +1535,19 @@ export function ScoreView({
         />
       )}
 
+      {tooltip && (
+        <div
+          className="pointer-events-none fixed z-50 rounded-lg bg-white/90 p-0.5 shadow-sm"
+          style={{
+            left: tooltip.tag.x,
+            top: tooltip.tag.y,
+            transform: tooltip.tag.left ? "translate(-100%, -50%)" : "translateY(-50%)",
+          }}
+          data-testid="tip-tag"
+        >
+          <ChordNoteChips spelled={[tooltip.own.spelled]} size="lg" />
+        </div>
+      )}
       {tooltip && (
         <div
           className="pointer-events-none fixed z-50 max-w-[260px] rounded-md border border-border bg-popover px-2.5 py-1.5 text-xs text-popover-foreground shadow-md"
