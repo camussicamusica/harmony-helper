@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import * as OSMDModule from "opensheetmusicdisplay";
 import { applyStemColors, parseSheetToNotes } from "@/lib/music/parseMusicXml";
 import { activeNotes, getPlaybackSeconds } from "@/lib/music/scheduler";
 import { hoverText, INTERVAL_KEY_LABEL } from "@/lib/music/naming";
+import { noteContext, type NoteContext } from "@/lib/music/analysis/noteContext";
+import { detectKeyFromNotes, type KeyInfo } from "@/lib/music/analysis/key";
 import { buildGeometry } from "@/lib/music/melodicLine";
 import { pitchClassColor } from "@/lib/music/midiUtils";
 import {
@@ -17,7 +19,7 @@ import { readableTextOn } from "@/lib/colors/color";
 import type { LineColorMode } from "@/lib/music/lineMode";
 import { IntervalLegend } from "./IntervalLegend";
 import { readScoreMeta, type ScoreMeta } from "@/lib/music/analysis/scoreMeta";
-import type { PieceChord } from "@/lib/music/analysis/pieceChords";
+import { pieceChords, type PieceChord } from "@/lib/music/analysis/pieceChords";
 import { getPalette, getRole } from "@/lib/colors/store";
 import { headHoverStyle, spelledPc } from "@/lib/colors/noteChip";
 import { buildNoteHitIndex, nearestNoteHit, type HeadBox, type NoteHitIndex } from "@/lib/music/noteHit";
@@ -72,6 +74,8 @@ interface Props {
   degradeLayer?: { intensity: number } | null;
   /** Reports the strongest intensity that keeps black noteheads at 4.5:1 for the current notes. */
   onDegradeCap?: (cap: number) => void;
+  /** Key of the piece (detected or chosen in the Ficha) for the hover panel; null = the panel detects it itself. */
+  hoverKey?: KeyInfo | null;
 }
 
 export interface PatternLayerView {
@@ -105,11 +109,13 @@ function svgEl<K extends keyof SVGElementTagNameMap>(
   return el;
 }
 
+/** Pointer grace before the tag / panel close (ms). */
+const TIP_GRACE_MS = 250;
+/** Width of the unfolded panel and the room a tag + panel need to the side of a note. */
+const TIP_PANEL_W = 290;
+const TIP_NEED_W = TIP_PANEL_W + 110;
+
 interface TooltipState {
-  x: number;
-  y: number;
-  /** Bubble goes under the system's lowest note or over its highest, never on the notes. */
-  place: "below" | "above";
   /** Colored name tag glued to the notehead itself, so name, color and position are seen in one glance. */
   tag: { x: number; y: number; left: boolean };
   line1: string;
@@ -146,6 +152,7 @@ export function ScoreView({
   patternLayer = null,
   degradeLayer = null,
   onDegradeCap,
+  hoverKey = null,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -217,6 +224,20 @@ export function ScoreView({
   const [reloadNonce, setReloadNonce] = useState(0);
   const [legendKeys, setLegendKeys] = useState<string[]>([]);
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
+  /** Side panel unfolded from the tag (hover), kept open by pointer or by a click (pinned). */
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [pinned, setPinned] = useState(false);
+  const [panelCtx, setPanelCtx] = useState<NoteContext | null>(null);
+  const [panelPos, setPanelPos] = useState<{ side: "left" | "right"; shiftY: number }>({ side: "right", shiftY: 0 });
+  const tipRootRef = useRef<HTMLDivElement | null>(null);
+  const tipTagRef = useRef<HTMLButtonElement | null>(null);
+  const tipPanelRef = useRef<HTMLDivElement | null>(null);
+  /** Mirrors of the panel state for the pointer handlers (no stale closures). */
+  const tipRef = useRef({ over: false, pinned: false, open: false, zone: false, timer: 0 });
+  const metaRef = useRef<ScoreMeta | null>(null);
+  const hoverKeyRef = useRef(hoverKey);
+  hoverKeyRef.current = hoverKey;
+  const fallbackRef = useRef<{ notes: ScheduledNote[]; key: KeyInfo | null; chords: PieceChord[] } | null>(null);
 
   const runCleanups = () => {
     try {
@@ -371,8 +392,40 @@ export function ScoreView({
     hitIndexRef.current = buildNoteHitIndex(boxes, { staffSpace: spBySys, splits });
   };
 
-  /** Stop lighting the hovered note: head, <g>, piano key and bubble. */
+  /** The pointer is on the tag or the panel, or the panel is pinned: the hovered note is frozen. */
+  const tipFrozen = () => tipRef.current.over || tipRef.current.pinned;
+
+  const cancelClose = () => {
+    if (tipRef.current.timer) window.clearTimeout(tipRef.current.timer);
+    tipRef.current.timer = 0;
+  };
+
+  /** After a short grace: fold the panel; drop the hover unless the pointer is back in the note's zone. */
+  const scheduleClose = () => {
+    const t = tipRef.current;
+    if (t.timer) return;
+    t.timer = window.setTimeout(() => {
+      t.timer = 0;
+      if (t.over || t.pinned) return;
+      if (t.open) {
+        t.open = false;
+        setPanelOpen(false);
+      }
+      if (!t.zone) clearNoteHover();
+    }, TIP_GRACE_MS);
+  };
+
+  /** Stop lighting the hovered note: head, <g>, piano key, tag and panel. */
   const clearNoteHover = () => {
+    cancelClose();
+    const t = tipRef.current;
+    t.over = false;
+    t.pinned = false;
+    t.open = false;
+    t.zone = false;
+    setPanelOpen(false);
+    setPinned(false);
+    setPanelCtx(null);
     const cur = hoverRef.current;
     if (!cur) return;
     hoverRef.current = null;
@@ -403,59 +456,105 @@ export function ScoreView({
     }
     containerRef.current?.classList.add("in-note-zone");
     hoverRef.current = { note, els, halo, head, x: NaN, y: NaN };
+    tipRef.current.zone = true;
   };
 
-  /** Bubble position: centered on the note, under (or, without room, over) the whole system (re-read live, so Tocar auto-scroll keeps it attached). */
+  /** Key and chords for the panel: the Ficha's when it has them, else detected here once per score. */
+  const analysisForPanel = (): { key: KeyInfo | null; chords: PieceChord[] } => {
+    if (hoverKeyRef.current) return { key: hoverKeyRef.current, chords: chordMarksRef.current };
+    const notes = notesRef.current;
+    if (fallbackRef.current?.notes !== notes) {
+      let key: KeyInfo | null = null;
+      let chords: PieceChord[] = [];
+      try {
+        if (notes.length) {
+          key = detectKeyFromNotes(notes, metaRef.current?.fifths).best.key;
+          if (metaRef.current) chords = pieceChords(notes, key, metaRef.current, bpmRef.current);
+        }
+      } catch {
+        /* no analysis: the panel just leaves those sections out */
+      }
+      fallbackRef.current = { notes, key, chords };
+    }
+    return fallbackRef.current;
+  };
+
+  /** Pointer entered the tag: unfold the panel (hover) with this note's analysis. */
+  const openPanel = () => {
+    const cur = hoverRef.current;
+    if (!cur) return;
+    const t = tipRef.current;
+    t.over = true;
+    cancelClose();
+    if (t.open) return;
+    t.open = true;
+    const { key, chords } = analysisForPanel();
+    const live = notesRef.current.find((n) => n.id === cur.note.id) ?? cur.note;
+    setPanelCtx(noteContext(live, notesRef.current, key, chords));
+    setPanelOpen(true);
+  };
+
+  const leaveTip = () => {
+    tipRef.current.over = false;
+    scheduleClose();
+  };
+
+  const togglePin = () => {
+    const t = tipRef.current;
+    t.pinned = !t.pinned;
+    setPinned(t.pinned);
+    if (t.pinned) openPanel();
+  };
+
+  /** Tag position: glued to the notehead (re-read live, so Tocar auto-scroll keeps it attached). */
   const placeTooltip = (note: ScheduledNote, force: boolean) => {
     const cur = hoverRef.current;
     if (!cur) return;
     const r = (note.headEl?.isConnected ? note.headEl : note.svgEls?.[0])?.getBoundingClientRect();
     if (!r) return;
-    // Vertical extent of this system near the note: staff lines plus every notehead within ±300px.
-    const sys = note.system ?? 0;
-    let top = r.top;
-    let bottom = r.bottom;
-    const wr = wrapRef.current?.getBoundingClientRect();
-    const rows = staffRowsRef.current.get(sys);
-    if (wr && rows?.length) {
-      top = Math.min(top, wr.top + rows[0].top);
-      bottom = Math.max(bottom, wr.top + rows[rows.length - 1].bottom);
-    }
-    for (const n of notesRef.current) {
-      if ((n.system ?? 0) !== sys || !n.headEl?.isConnected) continue;
-      const hr = n.headEl.getBoundingClientRect();
-      if (!hr.width || Math.abs(hr.left - r.left) > 300) continue;
-      top = Math.min(top, hr.top);
-      bottom = Math.max(bottom, hr.bottom);
-    }
-    const need = 150;
-    const place: "below" | "above" = window.innerHeight - bottom >= need || top < need ? "below" : "above";
-    const x = Math.round(r.left + r.width / 2);
-    const y = Math.round(place === "below" ? bottom + 10 : top - 10);
+    // Tag on the right of the note, unless the tag + the unfolded panel would not fit there but fit on the left.
+    const fitsRight = r.right + 5 + TIP_NEED_W <= window.innerWidth;
+    const fitsLeft = r.left - 5 - TIP_NEED_W >= 0;
+    const tagLeft = !fitsRight && (fitsLeft || r.right + 110 > window.innerWidth);
+    const x = Math.round(tagLeft ? r.left - 5 : r.right + 5);
+    const y = Math.round(r.top + r.height / 2);
     if (!force && x === cur.x && y === cur.y) return;
     cur.x = x;
     cur.y = y;
     const live = notesRef.current.find((n) => n.id === note.id) ?? note;
-    const tagLeft = r.right + 110 > window.innerWidth;
-    const tag = { x: Math.round(tagLeft ? r.left - 5 : r.right + 5), y: Math.round(r.top + r.height / 2), left: tagLeft };
-    setTooltip({ x, y, place, tag, ...hoverText(live, notesRef.current) });
+    setTooltip({ tag: { x, y, left: tagLeft }, ...hoverText(live, notesRef.current) });
   };
 
   /** Pointer (client px) -> nearest note zone -> hover. Overlays with their own hit target keep priority. */
   const updateNoteHover = (cx: number, cy: number, target: EventTarget | null, buttons: number) => {
     const wrap = wrapRef.current;
     const idx = hitIndexRef.current;
+    // Pointer on the tag / panel (or panel pinned): the note stays; only the tag follows the score.
+    if (tipFrozen()) {
+      const cur = hoverRef.current;
+      if (cur) placeTooltip(cur.note, false);
+      return;
+    }
     const overlay = [overlayRef, chordSvgRef, hardSvgRef].some((r) => r.current && target instanceof Node && r.current.contains(target));
     if (!wrap || !idx || overlay || buttons !== 0) return clearNoteHover();
     const wr = wrap.getBoundingClientRect();
     const hit = nearestNoteHit({ x: cx - wr.left, y: cy - wr.top }, idx);
     const note = hit ? notesRef.current.find((n) => String(n.id) === hit.id) : undefined;
-    if (!note) return clearNoteHover();
+    if (!note) {
+      // Left the zone: keep the tag a moment so the pointer can reach it.
+      tipRef.current.zone = false;
+      if (hoverRef.current) scheduleClose();
+      return;
+    }
     if (hoverRef.current?.note.id !== note.id) {
       clearNoteHover();
       showNoteHover(note);
       placeTooltip(note, true);
-    } else placeTooltip(note, false);
+    } else {
+      tipRef.current.zone = true;
+      if (!tipRef.current.open) cancelClose();
+      placeTooltip(note, false);
+    }
   };
 
   /** Where a chord mark sits: x over its first notes, y above the top staff of that system. */
@@ -1125,6 +1224,7 @@ export function ScoreView({
     notesOut(notes);
     try {
       const meta = readScoreMeta(osmd, bpmRef.current);
+      metaRef.current = meta;
       measureSecRef.current = meta.measures[0] ? meta.measures[0].endSec - meta.measures[0].startSec : 0;
       onScoreDataRef.current?.(notes, meta);
     } catch {
@@ -1219,10 +1319,13 @@ export function ScoreView({
     };
     const onLeave = () => {
       last = null;
-      clearNoteHover();
+      tipRef.current.zone = false;
+      if (tipFrozen()) return;
+      if (hoverRef.current) scheduleClose(); // the pointer may be heading for the tag
     };
     const onScroll = () => {
       if (last) queue(); // the score moved under a still pointer
+      else if (hoverRef.current) placeTooltip(hoverRef.current.note, false); // frozen on the tag: keep it attached
     };
     wrap.addEventListener("pointermove", onMove);
     wrap.addEventListener("pointerleave", onLeave);
@@ -1238,6 +1341,48 @@ export function ScoreView({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Panel placement: side (right of the tag, or left when there is no room), vertical clamp to the viewport.
+  useLayoutEffect(() => {
+    const tag = tipTagRef.current;
+    const panel = tipPanelRef.current;
+    if (!panelOpen || !tag || !panel) return;
+    const tr = tag.getBoundingClientRect();
+    const w = TIP_PANEL_W + 6;
+    const wantLeft = tooltip?.tag.left ?? false;
+    const side: "left" | "right" = wantLeft || tr.right + w + 8 > window.innerWidth ? "left" : "right";
+    const h = panel.getBoundingClientRect().height;
+    const margin = 8;
+    let top = tr.top;
+    if (top + h > window.innerHeight - margin) top = window.innerHeight - margin - h;
+    if (top < margin) top = margin;
+    const shiftY = Math.round(top - tr.top);
+    setPanelPos((p) => (p.side === side && Math.abs(p.shiftY - shiftY) < 1 ? p : { side, shiftY }));
+  });
+
+  // Pinned panel: Esc or a click anywhere else closes it.
+  useEffect(() => {
+    if (!pinned) return;
+    const close = () => {
+      tipRef.current.pinned = false;
+      setPinned(false);
+      clearNoteHover();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") close();
+    };
+    const onDown = (e: PointerEvent) => {
+      if (e.target instanceof Node && tipRootRef.current?.contains(e.target)) return;
+      close();
+    };
+    window.addEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onDown, true);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onDown, true);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pinned]);
 
   // Zoom — re-render OSMD and re-wire listeners + line.
   useEffect(() => {
@@ -1345,6 +1490,7 @@ export function ScoreView({
       measure(notes);
       onNotesRef.current(notes);
       const meta = readScoreMeta(osmd, bpm);
+      metaRef.current = meta;
       measureSecRef.current = meta.measures[0] ? meta.measures[0].endSec - meta.measures[0].startSec : 0;
       onScoreDataRef.current?.(notes, meta);
       drawPatterns();
@@ -1537,52 +1683,49 @@ export function ScoreView({
 
       {tooltip && (
         <div
-          className="pointer-events-none fixed z-50 rounded-lg bg-white/90 p-0.5 shadow-sm"
-          style={{
-            left: tooltip.tag.x,
-            top: tooltip.tag.y,
-            transform: tooltip.tag.left ? "translate(-100%, -50%)" : "translateY(-50%)",
-          }}
-          data-testid="tip-tag"
+          ref={tipRootRef}
+          className="fixed z-50"
+          style={
+            tooltip.tag.left
+              ? { right: document.documentElement.clientWidth - tooltip.tag.x, top: tooltip.tag.y, transform: "translateY(-50%)" }
+              : { left: tooltip.tag.x, top: tooltip.tag.y, transform: "translateY(-50%)" }
+          }
+          onPointerEnter={openPanel}
+          onPointerLeave={leaveTip}
+          data-testid="tip-root"
         >
-          <ChordNoteChips spelled={[tooltip.own.spelled]} size="lg" />
-        </div>
-      )}
-      {tooltip && (
-        <div
-          className="pointer-events-none fixed z-50 max-w-[260px] rounded-md border border-border bg-popover px-2.5 py-1.5 text-xs text-popover-foreground shadow-md"
-          style={{
-            left: Math.min(Math.max(tooltip.x, 140), window.innerWidth - 140),
-            top: tooltip.y,
-            transform: tooltip.place === "above" ? "translate(-50%, -100%)" : "translateX(-50%)",
-          }}
-        >
-          <div className="flex items-baseline gap-2" data-testid="tip-note">
-            <ChordNoteChips spelled={[tooltip.own.spelled]} size="lg" />
-            <span className="text-sm font-medium">{tooltip.own.duration}</span>
-            {tooltip.beat ? <span className="text-[11px] text-muted-foreground">tiempo {tooltip.beat}</span> : null}
-          </div>
-          {/* Small measure: barlines left and right, measure number top-left. */}
-          <div
-            className="relative mt-1.5 rounded-md border-x-2 border-y border-y-border border-x-foreground/80 px-2.5 pb-1.5 pt-4"
-            data-testid="tip-measure"
+          <button
+            ref={tipTagRef}
+            type="button"
+            className={`block cursor-pointer whitespace-nowrap rounded-lg bg-white/90 p-0.5 shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring ${pinned ? "ring-2 ring-foreground/70" : ""}`}
+            aria-expanded={panelOpen}
+            aria-label="Detalles de la nota"
+            onClick={togglePin}
+            data-testid="tip-tag"
           >
-            <span className="absolute left-1.5 top-0.5 text-[10px] leading-3 text-muted-foreground">
-              compás {tooltip.measure}
-            </span>
-            {tooltip.chord && (
-              <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Suenan juntas
+            <ChordNoteChips spelled={[tooltip.own.spelled]} size="lg" />
+          </button>
+          {panelOpen && panelCtx && (
+            <div
+              ref={tipPanelRef}
+              className="absolute top-0"
+              style={{
+                [panelPos.side === "right" ? "left" : "right"]: "100%",
+                [panelPos.side === "right" ? "paddingLeft" : "paddingRight"]: 6,
+                transform: `translateY(${panelPos.shiftY}px)`,
+                width: TIP_PANEL_W + 6,
+              }}
+              data-testid="tip-panel"
+              data-side={panelPos.side}
+            >
+              <div
+                className="tip-panel-card max-h-[calc(100vh-16px)] overflow-y-auto rounded-md border border-border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md"
+                data-side={panelPos.side}
+              >
+                <NotePanel tooltip={tooltip} ctx={panelCtx} />
               </div>
-            )}
-            <ChordNoteChips
-              spelled={tooltip.chord ? tooltip.chord.tones : [tooltip.own.spelled]}
-              ownIndex={tooltip.chord ? tooltip.chord.ownIndex : 0}
-            />
-            {tooltip.chord && (tooltip.chord.name || tooltip.chord.interval) && (
-              <div className="mt-1 text-[11px] font-medium">{tooltip.chord.name ?? tooltip.chord.interval}</div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1605,6 +1748,82 @@ export function ScoreView({
             </button>
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+/** Small-caps section header of the hover panel (the card's existing style). */
+function PanelSection({ title, children, testId }: { title: string; children: React.ReactNode; testId?: string }) {
+  return (
+    <section className="mt-2 first:mt-0" data-testid={testId}>
+      <div className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{title}</div>
+      {children}
+    </section>
+  );
+}
+
+/** Contents of the panel that unfolds from the note's tag. */
+function NotePanel({ tooltip, ctx }: { tooltip: TooltipState; ctx: NoteContext }) {
+  const { keyRole, chord, melody } = ctx;
+  return (
+    <div>
+      <PanelSection title="Nota" testId="tip-note">
+        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+          <ChordNoteChips spelled={[tooltip.own.spelled]} size="lg" />
+          <span className="text-sm font-medium" data-testid="tip-octave">{ctx.pitch.octaveLabel}</span>
+        </div>
+        <div className="mt-0.5 text-[11px]">
+          {tooltip.own.duration} · compás {tooltip.measure}
+          {tooltip.beat ? ` · tiempo ${tooltip.beat}` : ""}
+        </div>
+      </PanelSection>
+
+      {keyRole && (
+        <PanelSection title="En la tonalidad" testId="tip-key">
+          <div className="text-[11px] font-medium">{keyRole.text}</div>
+        </PanelSection>
+      )}
+
+      <PanelSection title="En el acorde" testId="tip-chord">
+        {chord ? (
+          <div>
+            <div className="text-[11px] font-medium">{chord.name}</div>
+            <ChordNoteChips className="mt-0.5" spelled={chord.tones} ownIndex={chord.ownIndex} />
+            <div className="mt-0.5 text-[11px]">
+              Esta nota es: <span className="font-medium">{chord.roleLabel}</span>
+            </div>
+            <div className="text-[11px]" data-testid="tip-chord-degree">
+              {chord.degreeText ?? (chord.inKey === false ? "acorde fuera de la tonalidad" : null)}
+            </div>
+          </div>
+        ) : (
+          <div className="text-[11px] text-muted-foreground">Sin un acorde claro en este momento.</div>
+        )}
+      </PanelSection>
+
+      {/* Small measure: barlines left and right, measure number top-left. */}
+      <PanelSection title="Suenan juntas">
+        <div
+          className="relative rounded-md border-x-2 border-y border-y-border border-x-foreground/80 px-2.5 pb-1.5 pt-4"
+          data-testid="tip-measure"
+        >
+          <span className="absolute left-1.5 top-0.5 text-[10px] leading-3 text-muted-foreground">compás {tooltip.measure}</span>
+          <ChordNoteChips
+            spelled={tooltip.chord ? tooltip.chord.tones : [tooltip.own.spelled]}
+            ownIndex={tooltip.chord ? tooltip.chord.ownIndex : 0}
+          />
+          {tooltip.chord && (tooltip.chord.name || tooltip.chord.interval) && (
+            <div className="mt-1 text-[11px] font-medium">{tooltip.chord.name ?? tooltip.chord.interval}</div>
+          )}
+        </div>
+      </PanelSection>
+
+      {(melody.prev || melody.next) && (
+        <PanelSection title="Melodía" testId="tip-melody">
+          {melody.prev && <div className="text-[11px]">{melody.prev.text}</div>}
+          {melody.next && <div className="text-[11px]">{melody.next.text}</div>}
+        </PanelSection>
       )}
     </div>
   );

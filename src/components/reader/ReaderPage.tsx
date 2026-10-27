@@ -422,6 +422,7 @@ export function ReaderPage() {
               patternLayer={patternView}
               degradeLayer={degradeView}
               onDegradeCap={setDegradeCap}
+              hoverKey={ficha.key}
             />
           )}
         </section>

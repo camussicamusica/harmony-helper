@@ -325,10 +325,34 @@ Partitura de prueba: `public/prototipos/patrones-ejemplo.musicxml`. En la barra,
 
 **Hover:** poner el mouse encima de algo, sin hacer clic.
 
-1. Poné el mouse sobre una nota, o cerca de ella: cada nota tiene una zona invisible a su alrededor (un poco más ancha que la cabeza, y como dos espacios del pentagrama hacia arriba y hacia abajo). Si el mouse está dentro de esa zona, la nota se enciende y aparece un cartelito al lado de la nota. En un acorde, la nota que se enciende es la que está más cerca del mouse en altura. Si el mouse está lejos de todas las notas, no pasa nada. Arriba, una cajita grande con la nota (por ejemplo "Sol (G)") y al lado la duración ("corchea", "blanca con puntillo") y el tiempo.
-2. Debajo hay un compás chiquito, con barras a los costados y el número de compás arriba a la izquierda. Adentro, una cajita por cada nota que suena junta (las dos manos), con la tuya marcada con borde grueso. Abajo, el nombre del acorde o, si son dos notas, el intervalo ("quinta justa"). Si la app no está segura del acorde, no lo adivina.
-3. Con la línea melódica prendida: poné el mouse sobre un tramo de la línea. Aparece la etiqueta del salto (por ejemplo "5ª J").
-4. La cabeza de la nota (la parte redonda) se enciende con su color de "Colores de las notas", aunque ese color esté apagado. Solo se enciende esa nota, no el resto del acorde ni la plica.
+1. Poné el mouse sobre una nota, o cerca de ella: cada nota tiene una zona invisible a su alrededor (un poco más ancha que la cabeza, y como dos espacios del pentagrama hacia arriba y hacia abajo).
+2. Si el mouse está dentro de esa zona, la nota se enciende: su cabeza toma su color y todo el dibujo de la nota se rodea de un borde blanco.
+3. Al lado de la nota aparece una etiqueta con el nombre de la nota (por ejemplo "Sol (G)"), pintada con el color de esa nota. Solo eso: no se abre ninguna cajita grande.
+4. En un acorde, la nota que se enciende es la que está más cerca del mouse en altura. Si el mouse está lejos de todas las notas, no pasa nada.
+5. **Para ver el detalle:** llevá el mouse desde la nota hasta su etiqueta.
+6. Del costado de la etiqueta se despliega un panel, como un menú que se desliza. Se abre hacia la derecha; si no hay lugar, hacia la izquierda. Queda pegado a la etiqueta y siempre entra en la pantalla.
+7. Mientras el mouse esté sobre la etiqueta o sobre el panel, no se cierra y la nota no cambia, aunque el mouse ya esté fuera de la zona de la nota.
+8. Para cerrarlo: sacá el mouse de la etiqueta y del panel. Se cierra solo después de un cuarto de segundo, y vuelve el hover normal.
+9. **Para dejarlo fijo:** hacé clic en la etiqueta. El panel queda abierto aunque muevas el mouse.
+10. Para soltarlo: apretá Esc, o hacé clic en cualquier otro lugar.
+11. Si tu computadora está configurada para reducir el movimiento, el panel aparece sin animación.
+
+El panel tiene estas secciones, cada una con su título en letras chicas:
+
+12. **NOTA:** la nota en grande con su color, la octava (por ejemplo "Re4"), la duración (por ejemplo "negra con puntillo") y "compás N · tiempo M".
+13. **EN LA TONALIDAD:** el grado de la nota en la tonalidad de la pieza, con su nombre. Por ejemplo: "4.º grado de Re mayor · subdominante". Los nombres son: tónica, supertónica, mediante, subdominante, dominante, superdominante y sensible (en menor, el 7.º grado natural se llama subtónica).
+14. Si la nota no es de la escala, dice "fuera de la escala de Re mayor" y, si se puede, qué cambió: "alteración: Do# en vez de Do". En menor, el 7.º elevado se marca como "sensible (7.º grado elevado)".
+15. La tonalidad es la de la Ficha. Si la elegiste a mano en la Ficha, usa esa. Con la Ficha cerrada, la app la detecta sola.
+16. **EN EL ACORDE:** el acorde que suena en ese momento (el de "Acordes de la pieza" de la Ficha; si no hay, el que forman las notas que suenan juntas), con una cajita de color por cada nota del acorde y la tuya marcada con borde grueso.
+17. Debajo dice qué es tu nota dentro del acorde: fundamental, tercera, quinta, séptima, novena, o "nota de paso / no es del acorde".
+18. Después, el grado y la función del acorde en la tonalidad, por ejemplo "IV · Subd" (Tón = tónica, Subd = subdominante, Dom = dominante). Si el acorde no es de la tonalidad, dice "acorde fuera de la tonalidad".
+19. Si no hay un acorde claro, dice "Sin un acorde claro en este momento". La app no adivina.
+20. **SUENAN JUNTAS:** un compás chiquito, con barras a los costados y el número de compás arriba a la izquierda. Adentro, una cajita por cada nota que suena junta (las dos manos), con la tuya marcada con borde grueso. Abajo, el nombre del acorde o, si son dos notas, el intervalo ("quinta justa").
+21. **MELODÍA:** la nota anterior y la siguiente de la misma mano, con el salto y su dirección. Por ejemplo: "viene de La (A): sube una 4.ª justa" y "va a Si (B): sube una 2.ª mayor". Si no hay nota anterior o siguiente, esa línea no aparece.
+22. En "Tocar", la etiqueta y el panel siguen pegados a la nota mientras la partitura se mueve sola.
+
+23. Con la línea melódica prendida: poné el mouse sobre un tramo de la línea. Aparece la etiqueta del salto (por ejemplo "5ª J").
+24. La cabeza de la nota (la parte redonda) se enciende con su color de "Colores de las notas", aunque ese color esté apagado. Solo se enciende esa nota, no el resto del acorde ni la plica.
 
 ---
 

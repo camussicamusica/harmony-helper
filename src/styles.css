@@ -204,3 +204,18 @@
   stroke-width: 1.6px;
   paint-order: stroke;
 }
+
+/* Note hover panel: unfolds sideways out of the tag, like a menu sliding out. */
+@keyframes tip-panel-in-right {
+  from { opacity: 0; transform: translateX(-10px) scaleX(0.92); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes tip-panel-in-left {
+  from { opacity: 0; transform: translateX(10px) scaleX(0.92); }
+  to { opacity: 1; transform: none; }
+}
+.tip-panel-card[data-side="right"] { transform-origin: left center; animation: tip-panel-in-right 150ms ease-out; }
+.tip-panel-card[data-side="left"] { transform-origin: right center; animation: tip-panel-in-left 150ms ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .tip-panel-card { animation: none !important; }
+}
