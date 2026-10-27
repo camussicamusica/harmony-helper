@@ -7,12 +7,13 @@ import { ColorStudio } from "@/components/studio/ColorStudio";
 import { NoteColorStrip } from "./NoteColorStrip";
 import { IntervalStrip } from "./IntervalStrip";
 import { LINE_MODES, type LineColorMode } from "@/lib/music/lineMode";
+import { nextTheme, THEME_LABEL, type ThemePref } from "@/lib/ui/theme";
 import { UploadZone } from "./UploadZone";
 import { MidiControl } from "./MidiControl";
 import { useLayersOpen } from "@/lib/music/analysis/useFicha";
 import type { ChordNamesLayer, DegradeLayer, PatternLayer } from "@/lib/music/analysis/usePatternLayer";
 import { ChordNamesControls, DegradeControls, PatternsControls } from "./LayerControls";
-import { ChevronDown, ChevronUp, Layers, ListMusic, Minus, Pause, Play, Plus, Route, Square } from "lucide-react";
+import { ChevronDown, Crosshair, Library, Monitor, Moon, Sun, ChevronUp, Layers, ListMusic, Minus, Pause, Play, Plus, Route, Square } from "lucide-react";
 
 interface Props {
   isPlaying: boolean;
@@ -38,6 +39,11 @@ interface Props {
   onBpmChange: (v: number, source: "slider" | "other") => void;
   onIsolationChange: (m: IsolationMode) => void;
   onZoomChange: (z: number) => void;
+  onCenter: () => void;
+  libraryOpen: boolean;
+  theme: ThemePref;
+  onThemeChange: (t: ThemePref) => void;
+  onLibraryToggle: () => void;
   onViewChange: (v: ScoreView) => void;
   onLineChange: (v: boolean) => void;
   onIntervalsChange: (v: boolean) => void;
@@ -76,6 +82,11 @@ export function TopBar({
   onBpmChange,
   onIsolationChange,
   onZoomChange,
+  onCenter,
+  libraryOpen,
+  theme,
+  onThemeChange,
+  onLibraryToggle,
   onViewChange,
   onLineChange,
   onIntervalsChange,
@@ -97,7 +108,7 @@ export function TopBar({
   return (
     <header data-chrome="top" className="sticky top-0 z-30 border-b border-border bg-card px-4 py-2">
       {/* Always-visible row: the essentials. */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
       <h1 className="text-base font-semibold tracking-tight">
         Harmony Helper
         {isPlaying && <span className="ml-2 text-xs italic text-muted-foreground">Reproduciendo</span>}
@@ -109,7 +120,7 @@ export function TopBar({
       </h1>
 
       <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
-        {(["tocar", "estudiar"] as ScoreView[]).map((v) => (
+        {(["tocar", "estudiar", "hoja"] as ScoreView[]).map((v) => (
           <button
             key={v}
             onClick={() => onViewChange(v)}
@@ -119,7 +130,7 @@ export function TopBar({
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            {v === "tocar" ? "Tocar" : "Estudiar"}
+            {v === "tocar" ? "Tocar" : v === "estudiar" ? "Estudiar" : "Hoja"}
           </button>
         ))}
       </div>
@@ -147,10 +158,11 @@ export function TopBar({
         compact={!menuOpen}
       />
 
+      <div className="ml-auto flex items-center gap-1">
       <Button
         size="sm"
         variant="ghost"
-        className="ml-auto h-8 gap-1 px-2 text-xs"
+        className="h-8 gap-1 px-2 text-xs"
         aria-expanded={menuOpen}
         aria-controls="top-menu-panel"
         aria-label={menuOpen ? "Ocultar menú" : "Mostrar menú"}
@@ -160,6 +172,19 @@ export function TopBar({
         {menuOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
         {menuOpen ? "Ocultar menú" : "Mostrar menú"}
       </Button>
+      <Button
+        size="icon"
+        variant="ghost"
+        className="h-8 w-8"
+        aria-label={`Tema: ${THEME_LABEL[theme]}. Tocá para cambiar a ${THEME_LABEL[nextTheme(theme)]}`}
+        title={`Tema: ${THEME_LABEL[theme]} (tocá para cambiar)`}
+        data-testid="theme-toggle"
+        data-theme-pref={theme}
+        onClick={() => onThemeChange(nextTheme(theme))}
+      >
+        {theme === "light" ? <Sun className="h-4 w-4" /> : theme === "dark" ? <Moon className="h-4 w-4" /> : <Monitor className="h-4 w-4" />}
+      </Button>
+      </div>
       </div>
 
       {/* Collapsible rest of the menu. */}
@@ -198,6 +223,9 @@ export function TopBar({
 
       <div className="ml-auto flex items-center gap-2">
         <UploadZone onScoreLoaded={onScoreLoaded} />
+        <Button size="sm" variant={libraryOpen ? "secondary" : "outline"} className="gap-1.5" onClick={onLibraryToggle} aria-pressed={libraryOpen}>
+          <Library className="h-4 w-4" /> Biblioteca
+        </Button>
         <Button
           size="sm"
           variant={recorridoOpen ? "secondary" : "outline"}
@@ -253,6 +281,16 @@ export function TopBar({
           <span className="w-10 text-xs tabular-nums text-muted-foreground">
             {Math.round(zoom * 100)}%
           </span>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 gap-1 px-2 text-xs"
+            onClick={onCenter}
+            aria-label="Centrar la partitura"
+            title="Centrar la partitura (C)"
+          >
+            <Crosshair className="h-3.5 w-3.5" /> Centrar
+          </Button>
         </div>
 
         <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">

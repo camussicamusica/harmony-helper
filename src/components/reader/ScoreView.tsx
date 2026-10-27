@@ -2,6 +2,10 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import * as OSMDModule from "opensheetmusicdisplay";
 import { applyStemColors, parseSheetToNotes } from "@/lib/music/parseMusicXml";
 import { activeNotes, getPlaybackSeconds } from "@/lib/music/scheduler";
+import { systemStartX } from "@/lib/music/boxMath";
+import { readLayoutInfo, withTitle } from "@/lib/music/layoutInfo";
+import { accidentalOwners, keySigAccidentals, modifierOwners, nearestMidiForPc } from "@/lib/music/accidentals";
+import { anchorScroll, canStartEstudiarDrag, centerScroll, tocarPadY } from "@/lib/music/panMath";
 import { hoverText, INTERVAL_KEY_LABEL, solfegeName } from "@/lib/music/naming";
 import { noteContext, type NoteContext } from "@/lib/music/analysis/noteContext";
 import { buildScaleView, type ScaleView } from "@/lib/music/analysis/scaleView";
@@ -9,7 +13,7 @@ import { ScaleInKey } from "./ScaleInKey";
 import { KeyPanel } from "./KeyPanel";
 import { buildKeySigView, fifthsAtMeasure, keyEvidence, measureRangeOf, type KeySigView } from "@/lib/music/analysis/keySignature";
 import { labelWidth, layoutLabels } from "@/lib/music/analysis/chordNames";
-import { playChordMidi } from "@/lib/music/analysis/audio";
+import { playChordMidi, playNoteMidi } from "@/lib/music/analysis/audio";
 import { detectKeyFromNotes, type KeyInfo } from "@/lib/music/analysis/key";
 import { buildGeometry } from "@/lib/music/melodicLine";
 import { pitchClassColor } from "@/lib/music/midiUtils";
@@ -31,7 +35,6 @@ import { headHoverStyle, spelledPc } from "@/lib/colors/noteChip";
 import { buildNoteHitIndex, nearestNoteHit, type HeadBox, type NoteHitIndex } from "@/lib/music/noteHit";
 import { bandScrollTop } from "@/lib/music/scrollMath";
 import {
-  assignModifiers,
   clefForNote,
   clefGlyph,
   clientToSvg,
@@ -64,6 +67,10 @@ interface Props {
   bpm: number;
   isolation: IsolationMode;
   zoom: number;
+  /** Bumps each time she asks to re-center ("Centrar" button or the C key). */
+  centerNonce?: number;
+  /** Hoja page header: her rename, else the file's title, else the cleaned filename. Null: draw none. */
+  title?: string | null;
   view: ViewMode;
   line: boolean;
   intervals: boolean;
@@ -137,6 +144,9 @@ interface PatternHit {
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 const NOW_LINE_FRACTION = 0.3;
+/** Hoja: width (px) of one page at zoom 100%, and the OSMD zoom that gives the printed look at that width. */
+const HOJA_BASE_W = 820;
+const HOJA_OSMD_ZOOM = 0.7;
 /** Radius of the melodic-line ring drawn around (not over) each notehead. */
 const RING_R = 8;
 
@@ -173,6 +183,8 @@ export function ScoreView({
   bpm,
   isolation,
   zoom,
+  centerNonce = 0,
+  title = null,
   view,
   line,
   intervals,
@@ -228,7 +240,7 @@ export function ScoreView({
   const onScoreDataRef = useRef(onScoreData);
   onScoreDataRef.current = onScoreData;
   const rightInsetRef = useRef(rightInset);
-  rightInsetRef.current = view === "estudiar" ? rightInset : 0;
+  rightInsetRef.current = view !== "tocar" ? rightInset : 0;
   const chordMarksRef = useRef(chordMarks);
   chordMarksRef.current = chordMarks;
   const occurrenceMarkRef = useRef(occurrenceMark);
@@ -268,6 +280,8 @@ export function ScoreView({
   const holdUntilRef = useRef(0);
 
   const [renderError, setRenderError] = useState<string | null>(null);
+  /** Hoja: the file has no printed line / page breaks, so OSMD laid the pages out by itself. */
+  const [autoLayout, setAutoLayout] = useState(false);
   const [reloadNonce, setReloadNonce] = useState(0);
   const [legendKeys, setLegendKeys] = useState<string[]>([]);
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
@@ -333,6 +347,25 @@ export function ScoreView({
         el.style.setProperty("--note-color", color);
       }
     }
+    paintKeySignatures();
+  };
+
+  /** Each sharp / flat of a key signature wears the color of the note it alters (F# line -> Fa# color), unless that note's color is off. */
+  const paintKeySignatures = () => {
+    for (const z of keyZonesRef.current) {
+      if (!z.el) continue;
+      const fifths = fifthsForZone(z);
+      if (fifths === null || fifths === 0) continue;
+      const glyphs = keySigAccidentals(fifths, z.staff === 0 ? "treble" : "bass");
+      const paths = Array.from(z.el.querySelectorAll<SVGElement>("path")).sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left);
+      if (paths.length !== glyphs.length) continue; // unexpected drawing: leave it black
+      paths.forEach((p, i) => {
+        const pc = glyphs[i].pc;
+        const c = noteTargetOn(pc, "accidental") ? pitchClassColor(pc) : PLAIN_COLOR;
+        p.setAttribute("fill", c);
+        p.style.fill = c;
+      });
+    }
   };
 
   /** Notehead centers (px, relative to the score wrapper) + the time -> x table used by Tocar's auto-scroll. */
@@ -363,6 +396,27 @@ export function ScoreView({
       // Same pairing for the head element itself (needed by the per-notehead hover).
       const headEls = heads.filter((h) => { const b = h.getBoundingClientRect(); return b.width || b.height; })
         .sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top);
+      // Each printed accidental goes to the head it sits in front of, so it can wear that note's color.
+      if (headEls.length === ranked.length) {
+        const hb = headEls.map((h) => {
+          const r = h.getBoundingClientRect();
+          return { cy: r.top + r.height / 2, left: r.left, right: r.right };
+        });
+        const modEls = Array.from(el.querySelectorAll<SVGElement>(".vf-modifiers path"));
+        const sp = Math.max(4, hb.length ? headEls[0].getBoundingClientRect().height : 8);
+        const owners = accidentalOwners(
+          hb,
+          modEls.map((m) => {
+            const r = m.getBoundingClientRect();
+            return { cy: r.top + r.height / 2, left: r.left, right: r.right, w: r.width, h: r.height };
+          }),
+          sp,
+        );
+        ranked.forEach((n) => (n.accidentalEls = []));
+        owners.forEach((o, i) => {
+          if (o >= 0) ranked[o].accidentalEls!.push(modEls[i]);
+        });
+      }
       ranked.forEach((n, i) => {
         n.headEl = headEls.length === ranked.length ? headEls[i] : headEls.length === 1 ? headEls[0] : undefined;
         const r = rects.length === ranked.length ? rects[i] : rects.length ? rects[0] : whole;
@@ -626,6 +680,7 @@ export function ScoreView({
     cur.els.forEach((el) => el.classList.remove("note-hover"));
     cur.halo.forEach((el) => el.classList.remove("note-halo"));
     cur.head?.classList.remove("head-hover-fill", "head-hover-glow");
+    cur.note.accidentalEls?.forEach((a) => a.classList.remove("head-hover-fill", "head-hover-glow"));
     containerRef.current?.classList.remove("in-note-zone");
     setTooltip(null);
   };
@@ -645,6 +700,16 @@ export function ScoreView({
       if (hh) {
         head.style.setProperty("--head-color", hh.color);
         head.classList.add(hh.mode === "fill" ? "head-hover-fill" : "head-hover-glow");
+      }
+    }
+    // Its accidental lights up with it.
+    if (head) {
+      const hh2 = headHoverStyle(spelledPc(note.spelledName) >= 0 ? spelledPc(note.spelledName) : note.midi % 12, getPalette().roles);
+      if (hh2) {
+        for (const a of note.accidentalEls ?? []) {
+          a.style.setProperty("--head-color", hh2.color);
+          a.classList.add(hh2.mode === "fill" ? "head-hover-fill" : "head-hover-glow");
+        }
       }
     }
     containerRef.current?.classList.add("in-note-zone");
@@ -716,9 +781,9 @@ export function ScoreView({
         const rect = (e: Element) => e.getBoundingClientRect();
         const ownIdx = heads.findIndex((h) => headPaths.includes(h));
         const mods = Array.from(group.querySelectorAll(".vf-modifiers path"));
-        const owner = assignModifiers(
+        const owner = modifierOwners(
           heads.map((h) => ({ cy: rect(h).top + rect(h).height / 2, left: rect(h).left, right: rect(h).right })),
-          mods.map((m) => ({ cy: rect(m).top + rect(m).height / 2, left: rect(m).left, right: rect(m).right, w: rect(m).width })),
+          mods.map((m) => ({ cy: rect(m).top + rect(m).height / 2, left: rect(m).left, right: rect(m).right, w: rect(m).width, h: rect(m).height })),
           spPx,
         );
         mods.forEach((m, i) => {
@@ -1050,14 +1115,30 @@ export function ScoreView({
         y.max = Math.max(y.max, n.cy);
       } else ySys.set(sys, { min: n.cy, max: n.cy });
     }
+    const wr0 = wrapRef.current?.getBoundingClientRect();
+    const sigEls = wr0
+      ? Array.from(containerRef.current?.querySelectorAll("g.vf-clef, g.vf-keysignature, g.vf-timesignature") ?? [])
+          .map((g) => g.getBoundingClientRect())
+          .filter((r) => r.width > 0)
+          .map((r) => ({ rightX: r.right - wr0.left, cy: (r.top + r.bottom) / 2 - wr0.top }))
+      : [];
     for (const [sys, ms] of bySys) {
       const list = [...ms.entries()].sort((a, b) => a[1].min - b[1].min);
       const yr = ySys.get(sys)!;
       const top = systemTopRef.current.get(sys);
       const y0 = (top !== undefined ? Math.min(top, yr.min - 8) : yr.min - 30) - 8;
       const y1 = yr.max + 30;
+      // Right edge of the clef / key / time signature that opens this system (they sit left of its first note).
+      let sigRight: number | null = null;
+      if (sigEls.length && list.length) {
+        const first = list[0][1].min;
+        for (const g of sigEls) {
+          if (g.rightX > first + 4 || g.cy < y0 || g.cy > y1) continue;
+          sigRight = Math.max(sigRight ?? -Infinity, g.rightX);
+        }
+      }
       list.forEach(([num, r], i) => {
-        const x0 = i === 0 ? r.min - 26 : (list[i - 1][1].max + r.min) / 2;
+        const x0 = i === 0 ? systemStartX({ firstNoteX: r.min, sigRight }) : (list[i - 1][1].max + r.min) / 2;
         const x1 = i === list.length - 1 ? r.max + 26 : (r.max + list[i + 1][1].min) / 2;
         out.set(num, { x0, x1, y0, y1 });
       });
@@ -1392,6 +1473,8 @@ export function ScoreView({
     const wr = wrap.getBoundingClientRect();
     const x = e.clientX - wr.left;
     const y = e.clientY - wr.top;
+    // The key signature keeps priority: a pattern box never answers for a pointer on it.
+    if (keyZonesRef.current.some((z) => x >= z.x0 && x <= z.x1 && y >= z.y0 && y <= z.y1)) return null;
     for (const h of patternHitsRef.current) {
       for (const r of h.rects) if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) return h;
     }
@@ -1416,6 +1499,10 @@ export function ScoreView({
 
   /** Click in "Marcar compás difícil" mode: which measure is under the pointer? */
   const onWrapClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    // A click (no drag: onClickCapture drops the click after a drag) on a note inside its hover zone plays that note.
+    if (!markModeRef.current && hoverRef.current && !patternHitAt(e)) {
+      void playNoteMidi(hoverRef.current.note.midi);
+    }
     if (!markModeRef.current && patternLayerRef.current) {
       // Click on a pattern box: go to the next occurrence of that pattern.
       const hit = patternHitAt(e);
@@ -1664,6 +1751,12 @@ export function ScoreView({
   /** Render OSMD. In Tocar the zoom is fitted to the band height (zoom slider multiplies on top). */
   const renderScore = (osmd: any, refit: boolean) => {
     const tocar = viewRef.current === "tocar";
+    // Room above and below the staff, so zooming in never leaves part of it out of reach and any band can sit mid-view.
+    if (wrapRef.current) {
+      const pad = tocar ? tocarPadY(scrollRef.current?.clientHeight ?? 0) : 0;
+      wrapRef.current.style.paddingTop = tocar ? `${pad}px` : "";
+      wrapRef.current.style.paddingBottom = tocar ? `${pad}px` : "";
+    }
     if (tocar && refit) {
       osmd.Zoom = 1;
       osmd.render();
@@ -1672,11 +1765,98 @@ export function ScoreView({
       const bandH = scrollRef.current?.clientHeight ?? 0;
       fitRef.current = h > 0 && bandH > 0 ? Math.max(0.3, Math.min(4, (bandH - 8) / h)) : 1;
     }
-    osmd.Zoom = (tocar ? fitRef.current : 1) * zoomRef.current;
+    if (viewRef.current === "hoja" && containerRef.current) {
+      // A sheet of paper: its width (and so every page) scales with the zoom, the number of measures per line does not.
+      containerRef.current.style.width = `${HOJA_BASE_W * zoomRef.current}px`;
+      osmd.Zoom = HOJA_OSMD_ZOOM * zoomRef.current;
+    } else {
+      osmd.Zoom = (tocar ? fitRef.current : 1) * zoomRef.current;
+    }
     osmd.render();
   };
 
+  /** Width of the rendered score (px): what zoom scales. */
+  const scoreWidth = () => containerRef.current?.getBoundingClientRect().width ?? 0;
+
+  /** Tocar: scroll so the middle of the staff band is the middle of the visible area (the staff itself, not the SVG's margins). */
+  const centerVertical = () => {
+    const sc = scrollRef.current;
+    const wrap = wrapRef.current;
+    if (!sc || !wrap || viewRef.current !== "tocar") return;
+    let y0: number;
+    let y1: number;
+    const band = systemBand(0);
+    if (band) {
+      y0 = band.y0;
+      y1 = band.y1;
+    } else {
+      const r = containerRef.current?.getBoundingClientRect();
+      const wr = wrap.getBoundingClientRect();
+      if (!r) return;
+      y0 = r.top - wr.top;
+      y1 = r.bottom - wr.top;
+    }
+    sc.scrollTop = centerScroll({ bandStart: y0, bandEnd: y1, viewSize: sc.clientHeight, contentSize: sc.scrollHeight });
+  };
+
+  /** After a zoom re-render: same musical point at the same screen x (now-line in Tocar, view center in Estudiar); Tocar also re-centers vertically. */
+  const settleAfterZoom = (prev: { w: number; left: number }) => {
+    const sc = scrollRef.current;
+    if (!sc) return;
+    const tocarView = viewRef.current === "tocar";
+    const origin = tocarView ? NOW_LINE_FRACTION * sc.clientWidth : 16;
+    sc.scrollLeft = anchorScroll({
+      scroll: prev.left,
+      oldSize: prev.w,
+      newSize: scoreWidth(),
+      anchor: tocarView ? origin : sc.clientWidth / 2,
+      origin,
+      viewSize: sc.clientWidth,
+      contentSize: sc.scrollWidth,
+    });
+    if (tocarView) centerVertical();
+  };
+
+  /** "Centrar": Tocar puts the staff mid-view and the playback position back under the now-line; Estudiar centers sideways and brings the system at mid-screen into view. */
+  const centerNow = () => {
+    const sc = scrollRef.current;
+    if (!sc) return;
+    if (viewRef.current === "tocar") {
+      const secs = getPlaybackSeconds();
+      const x = secs < 0.01 ? null : xAt(secs); // stopped: back to the start, as Detener does
+      const max = Math.max(0, sc.scrollWidth - sc.clientWidth);
+      centerVertical();
+      sc.scrollTo({ left: x === null ? 0 : Math.max(0, Math.min(max, x - NOW_LINE_FRACTION * sc.clientWidth)), behavior: "smooth" });
+      return;
+    }
+    sc.scrollTo({ left: Math.max(0, (sc.scrollWidth - sc.clientWidth) / 2), behavior: "smooth" });
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    const wr = wrap.getBoundingClientRect();
+    const midY = window.innerHeight / 2 - wr.top;
+    let best: { sys: number; d: number } | null = null;
+    for (const sys of staffRowsRef.current.keys()) {
+      const b = systemBand(sys);
+      if (!b) continue;
+      const d = midY < b.y0 ? b.y0 - midY : midY > b.y1 ? midY - b.y1 : 0;
+      if (!best || d < best.d) best = { sys, d };
+    }
+    const b = best ? systemBand(best.sys) : null;
+    if (b) scrollBandIntoView(b.y0, b.y1, { y0: b.ty0, y1: b.ty1 });
+  };
+
+  /** Hoja: tag every page element with "Página N de M" (shown under it by CSS). */
+  const labelPages = () => {
+    if (viewRef.current !== "hoja") return;
+    const pages = Array.from(containerRef.current?.children ?? []).filter((c) => c.querySelector("svg")) as HTMLElement[];
+    pages.forEach((p, i) => {
+      p.dataset.page = String(i + 1);
+      p.dataset.label = `Página ${i + 1} de ${pages.length}`;
+    });
+  };
+
   const wireAfterRender = (notesOut: (n: ScheduledNote[]) => void) => {
+    labelPages();
     runCleanups();
     activeNotes.clearHover();
     setTooltip(null);
@@ -1686,8 +1866,8 @@ export function ScoreView({
     const { notes } = parseSheetToNotes(osmd, bpmRef.current);
 
     notesRef.current = notes;
+    measure(notes); // pairs heads, accidentals and key-signature zones first
     paintNotes(notes);
-    measure(notes);
 
     // Hover is handled by one pointer listener on the score (nearest-note zones), see the "Note hover zones" effect.
     hoverRef.current = null;
@@ -1722,16 +1902,26 @@ export function ScoreView({
       return;
     }
 
+    const layout = readLayoutInfo(xml);
+    setAutoLayout(view === "hoja" && !layout.hasBreaks);
     let osmd: any;
     try {
       osmd = new OpenSheetMusicDisplayCtor(container, {
         autoResize: false,
         backend: "svg",
-        drawTitle: false,
+        drawTitle: view === "hoja" && !!title,
         drawSubtitle: false,
-        drawComposer: false,
+        drawComposer: view === "hoja" && /<creator[^>]*type="composer"[^>]*>\s*[^<\s]/.test(xml),
         drawCredits: false,
         renderSingleHorizontalStaffline: view === "tocar",
+        ...(view === "hoja"
+          ? {
+              // Printed pages like her paper: A4 sheets, the file's own line and page breaks when it has them.
+              pageFormat: layout.page ? `${Math.round(layout.page.width)}x${Math.round(layout.page.height)}` : "A4_P",
+              newSystemFromXML: layout.hasBreaks,
+              newPageFromXML: layout.hasBreaks,
+            }
+          : {}),
       });
     } catch (e) {
       console.error("OSMD init failed:", e);
@@ -1744,12 +1934,16 @@ export function ScoreView({
 
     (async () => {
       try {
-        await osmd.load(xml);
+        await osmd.load(view === "hoja" && title ? withTitle(xml, title) : xml);
+        if (cancelled) return;
+        // Hoja sizes its pages from the container's width: wait until the layout has given it one.
+        for (let i = 0; i < 20 && view === "hoja" && container.offsetWidth < 50; i++) await new Promise((r) => requestAnimationFrame(r));
         if (cancelled) return;
         applyStemColors(osmd);
         renderScore(osmd, true);
         readyRef.current = true;
         wireAfterRender(onNotesRef.current);
+        centerVertical();
       } catch (e) {
         if (cancelled) return;
         console.error("OSMD load/render failed:", e);
@@ -1774,7 +1968,7 @@ export function ScoreView({
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [xml, reloadNonce, view]);
+  }, [xml, reloadNonce, view, view === "hoja" ? title : null]);
 
   // Note hover zones — one pointer listener on the score; hit testing is a cheap search in precomputed boxes, rAF-throttled.
   useEffect(() => {
@@ -1902,14 +2096,57 @@ export function ScoreView({
     const osmd = osmdRef.current;
     if (!osmd || !readyRef.current) return;
     try {
+      const prev = { w: scoreWidth(), left: scrollRef.current?.scrollLeft ?? 0 };
       renderScore(osmd, false);
       wireAfterRender(onNotesRef.current);
+      settleAfterZoom(prev);
     } catch (e) {
       console.error("Zoom render failed:", e);
       setRenderError("Failed to re-render sheet music at this zoom level.");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [zoom]);
+
+  // "Centrar" (button or C key).
+  useEffect(() => {
+    if (centerNonce > 0 && readyRef.current) centerNow();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [centerNonce]);
+
+  // Estudiar: hold the space bar to drag the page with the mouse anywhere (text and clicks keep working otherwise).
+  const [spaceHeld, setSpaceHeld] = useState(false);
+  const spaceRef = useRef(false);
+  useEffect(() => {
+    if (view === "tocar") return;
+    const typing = (t: EventTarget | null) => {
+      const el = t as HTMLElement | null;
+      return !!el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT|BUTTON|A)$/.test(el.tagName) || el.getAttribute?.("role") === "slider");
+    };
+    const down = (e: KeyboardEvent) => {
+      if (e.code !== "Space" || e.ctrlKey || e.metaKey || e.altKey || typing(e.target)) return;
+      e.preventDefault(); // no page-down while she is panning
+      spaceRef.current = true;
+      setSpaceHeld(true);
+    };
+    const up = (e: KeyboardEvent) => {
+      if (e.code !== "Space") return;
+      spaceRef.current = false;
+      setSpaceHeld(false);
+    };
+    const blur = () => {
+      spaceRef.current = false;
+      setSpaceHeld(false);
+    };
+    window.addEventListener("keydown", down);
+    window.addEventListener("keyup", up);
+    window.addEventListener("blur", blur);
+    return () => {
+      window.removeEventListener("keydown", down);
+      window.removeEventListener("keyup", up);
+      window.removeEventListener("blur", blur);
+      blur();
+    };
+  }, [view]);
 
   // Container resize — Estudiar re-wraps to the new width; Tocar re-fits to the new height.
   useEffect(() => {
@@ -1934,6 +2171,7 @@ export function ScoreView({
             if (dh) {
               renderScore(osmd, true);
               wireAfterRender(onNotesRef.current);
+              centerVertical();
             } else if (dw) {
               relayout();
             }
@@ -2112,39 +2350,67 @@ export function ScoreView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPlaying, view]);
 
-  // Tocar manual scrolling: drag (and wheel) pauses the follow for a moment.
-  const dragRef = useRef<{ x: number; left: number; moved: boolean } | null>(null);
+  // Manual panning: drag the sheet (and wheel / trackpad) pauses the playback follow for a moment.
+  // Tocar: drag anywhere, both directions. Estudiar: only the mouse on empty space, or with the space bar held.
+  const dragRef = useRef<{ x: number; y: number; left: number; top: number; winTop: number; moved: boolean } | null>(null);
+  const justDraggedRef = useRef(false);
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (view !== "tocar" || e.button !== 0) return;
-    dragRef.current = { x: e.clientX, left: scrollRef.current?.scrollLeft ?? 0, moved: false };
+    if (e.button !== 0) return;
+    const sc = scrollRef.current;
+    if (view !== "tocar") {
+      if (e.pointerType !== "mouse") return; // touch keeps its native scroll
+      const t = e.target as Element;
+      const empty =
+        t === sc || t === wrapRef.current || t === containerRef.current || (t instanceof SVGSVGElement && containerRef.current?.contains(t));
+      if (!canStartEstudiarDrag({ spaceHeld: spaceRef.current, onEmptySpace: !!empty })) return;
+    }
+    dragRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      left: sc?.scrollLeft ?? 0,
+      top: sc?.scrollTop ?? 0,
+      winTop: window.scrollY,
+      moved: false,
+    };
   };
   const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     const d = dragRef.current;
     const sc = scrollRef.current;
     if (!d || !sc) return;
     const dx = e.clientX - d.x;
-    if (!d.moved && Math.abs(dx) > 4) {
+    const dy = e.clientY - d.y;
+    if (!d.moved && Math.hypot(dx, dy) > 4) {
       d.moved = true;
+      clearNoteHover();
       try {
         sc.setPointerCapture(e.pointerId);
       } catch {
         /* ignore */
       }
+      if (view !== "tocar") document.body.style.userSelect = "none"; // no text selection while panning
     }
     if (d.moved) {
       holdUntilRef.current = performance.now() + 1500;
       sc.scrollLeft = d.left - dx;
+      if (view === "tocar") sc.scrollTop = d.top - dy;
+      else window.scrollTo({ top: d.winTop - dy, behavior: "instant" as ScrollBehavior });
     }
   };
   const endDrag = () => {
+    if (dragRef.current?.moved) {
+      // The click that follows a drag must not press chord labels, pattern boxes or "marcar compás".
+      justDraggedRef.current = true;
+      setTimeout(() => (justDraggedRef.current = false), 0);
+    }
     dragRef.current = null;
+    document.body.style.userSelect = "";
   };
 
   const tocar = view === "tocar";
 
   return (
     <div
-      className={tocar ? "relative h-full w-full bg-background" : "relative w-full bg-background"}
+      className={tocar ? "relative h-full w-full bg-[var(--desk)]" : "relative w-full bg-[var(--desk)]"}
       // Estudiar with the Ficha open: the score container gets narrower, its resize observer re-wraps the systems.
       style={!tocar && rightInset > 0 ? { paddingRight: rightInset } : undefined}
     >
@@ -2154,11 +2420,19 @@ export function ScoreView({
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
+        onClickCapture={(e) => {
+          if (justDraggedRef.current) {
+            e.stopPropagation();
+            e.preventDefault();
+          }
+        }}
         onWheel={() => {
           holdUntilRef.current = performance.now() + 1500;
         }}
         className={
-          tocar ? "h-full w-full cursor-grab overflow-x-auto overflow-y-hidden" : "w-full"
+          tocar
+            ? "score-sheet score-sheet-tocar h-full w-full cursor-grab overflow-auto active:cursor-grabbing"
+            : `w-full overflow-x-auto ${view === "hoja" ? "hoja-desk" : "score-sheet"} ${spaceHeld ? "cursor-grab active:cursor-grabbing" : ""}`
         }
       >
         <div
@@ -2178,7 +2452,7 @@ export function ScoreView({
                   paddingLeft: `${NOW_LINE_FRACTION * 100}%`,
                   paddingRight: `${(1 - NOW_LINE_FRACTION) * 100}%`,
                 }
-              : { padding: 16 }
+              : { padding: view === "hoja" ? 24 : 16 }
           }
         >
           {/* Behind the notes: pattern boxes first, then the degradé. The score sits above them. */}
@@ -2187,7 +2461,13 @@ export function ScoreView({
           <div
             ref={containerRef}
             className="score-root"
-            style={tocar ? { flex: "none", minWidth: 200, position: "relative" } : { width: "100%", position: "relative" }}
+            style={
+              tocar
+                ? { flex: "none", minWidth: 200, position: "relative" }
+                : view === "hoja"
+                  ? { width: HOJA_BASE_W * zoom, margin: "0 auto", position: "relative" }
+                  : { width: "100%", position: "relative" }
+            }
           />
           <svg ref={overlayRef} className="pointer-events-none absolute left-0 top-0" />
           <svg ref={chordSvgRef} className="pointer-events-none absolute left-0 top-0" />
@@ -2195,6 +2475,12 @@ export function ScoreView({
           <svg ref={chordNameSvgRef} className="pointer-events-none absolute left-0 top-0" aria-label="Nombres de acordes" />
         </div>
       </div>
+
+      {view === "hoja" && autoLayout && (
+        <p className="pointer-events-none absolute left-1/2 top-2 z-10 -translate-x-1/2 rounded-md border border-border bg-card/95 px-3 py-1 text-xs text-muted-foreground shadow-sm" role="note">
+          Esta partitura no trae los cortes del papel; la app los calculó.
+        </p>
+      )}
 
       {line && lineMode !== "notas" && <IntervalLegend keys={legendKeys} />}
 
@@ -2306,6 +2592,7 @@ export function ScoreView({
                   scale={panelScale}
                   closeup={panelCloseup}
                   flipped={panelPos.flipped}
+                  refMidi={hoverRef.current?.note.midi ?? 60}
                   more={tipMore}
                   onMore={(v) => {
                     setTipMore(v);
@@ -2353,7 +2640,7 @@ function PanelSection({ title, children, testId }: { title: string; children: Re
 }
 
 /** The cropped score "photo": mounts the prepared SVG clone. */
-function Closeup({ svg, flipped }: { svg: SVGSVGElement; flipped?: boolean }) {
+function Closeup({ svg, flipped, onClick }: { svg: SVGSVGElement; flipped?: boolean; onClick?: () => void }) {
   const ref = useRef<HTMLDivElement | null>(null);
   useLayoutEffect(() => {
     const host = ref.current;
@@ -2366,7 +2653,10 @@ function Closeup({ svg, flipped }: { svg: SVGSVGElement; flipped?: boolean }) {
   return (
     <div
       ref={ref}
-      className={`score-root mx-auto ${flipped ? "mt-1.5" : "mb-1"} overflow-hidden rounded border border-border bg-white`}
+      onClick={onClick}
+      role={onClick ? "button" : undefined}
+      aria-label={onClick ? "Tocar esta nota" : undefined}
+      className={`score-root mx-auto ${flipped ? "mt-1.5" : "mb-1"} overflow-hidden rounded border border-border bg-white ${onClick ? "cursor-pointer" : ""}`}
       style={{ width: svg.getAttribute("width") + "px", height: svg.getAttribute("height") + "px", maxWidth: "100%" }}
       data-testid="tip-closeup"
     />
@@ -2393,6 +2683,7 @@ function NotePanel({
   scale,
   closeup,
   flipped,
+  refMidi,
   more,
   onMore,
 }: {
@@ -2401,15 +2692,23 @@ function NotePanel({
   scale: ScaleView | null;
   closeup: SVGSVGElement | null;
   flipped?: boolean;
+  /** MIDI of the hovered note: chips that only know a name play the nearest note of that name. */
+  refMidi: number;
   more: boolean;
   onMore: (open: boolean) => void;
 }) {
   const { keyRole, chord, melody, figure, moment } = ctx;
-  const photo = closeup && <Closeup svg={closeup} flipped={flipped} />;
+  const midiOf = (spelled: string) => {
+    const pc = spelledPc(spelled);
+    return pc >= 0 ? nearestMidiForPc(pc, refMidi) : refMidi;
+  };
+  const playName = (spelled: string) => void playNoteMidi(midiOf(spelled));
+  const playTones = (tones: string[]) => void playChordMidi(tones.map(midiOf));
+  const photo = closeup && <Closeup svg={closeup} flipped={flipped} onClick={() => void playNoteMidi(refMidi)} />;
   const notaSection = (
     <PanelSection title="Nota" testId="tip-note">
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <ChordNoteChips spelled={[tooltip.own.spelled]} size="lg" />
+        <ChordNoteChips spelled={[tooltip.own.spelled]} size="lg" onNoteClick={playName} />
         <span className="text-sm font-medium" data-testid="tip-octave">{ctx.pitch.octaveLabel}</span>
       </div>
       <div className="mt-0.5 text-[11px]">
@@ -2436,7 +2735,7 @@ function NotePanel({
             <div className="text-[11px] text-muted-foreground">Nota sola (sin otras notas en su figura)</div>
           ) : (
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <ChordNoteChips spelled={figure.tones} ownIndex={figure.ownIndex} />
+              <ChordNoteChips spelled={figure.tones} ownIndex={figure.ownIndex} onNoteClick={playName} />
               {(figure.chord || figure.interval) && <span className="text-[11px] font-medium">{figure.chord ?? figure.interval}</span>}
             </div>
           )}
@@ -2464,8 +2763,10 @@ function NotePanel({
             <MoreSection title="Armonía" open testId="tip-chord">
               {chord ? (
                 <div>
-                  <div className="text-[11px] font-medium">{chord.name}</div>
-                  <ChordNoteChips className="mt-0.5" spelled={chord.tones} ownIndex={chord.ownIndex} />
+                  <button type="button" className="text-left text-[11px] font-medium underline-offset-2 hover:underline" onClick={() => playTones(chord.tones)} aria-label={`Tocar el acorde ${chord.name}`}>
+                    {chord.name}
+                  </button>
+                  <ChordNoteChips className="mt-0.5" spelled={chord.tones} ownIndex={chord.ownIndex} onNoteClick={playName} />
                   <div className="mt-0.5 text-[11px]">
                     Esta nota es: <span className="font-medium">{chord.roleLabel}</span>
                   </div>
@@ -2486,7 +2787,7 @@ function NotePanel({
                   data-testid="tip-measure"
                 >
                   <span className="absolute left-1.5 top-0.5 text-[10px] leading-3 text-muted-foreground">compás {tooltip.measure}</span>
-                  <ChordNoteChips spelled={moment.tones} ownIndex={moment.ownIndex} />
+                  <ChordNoteChips spelled={moment.tones} ownIndex={moment.ownIndex} onNoteClick={playName} />
                   {moment.held.some(Boolean) && (
                     <div className="mt-1 text-[10px] text-muted-foreground">
                       sostenida{moment.held.filter(Boolean).length > 1 ? "s" : ""}: {moment.tones.filter((_, i) => moment.held[i]).map((t) => solfegeName(t)).join(", ")}

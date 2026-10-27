@@ -38,4 +38,4 @@ export interface ScheduledNote {
   accidentalEls?: SVGElement[];
 }
 
-export type ScoreView = "tocar" | "estudiar";
+export type ScoreView = "tocar" | "estudiar" | "hoja";

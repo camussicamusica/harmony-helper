@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { THEME_INIT_SCRIPT } from "@/lib/ui/theme";
 import {
   Outlet,
   Link,
@@ -107,6 +108,7 @@ function RootShell({ children }: { children: ReactNode }) {
   return (
     <html lang="es-AR">
       <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <HeadContent />
       </head>
       <body>

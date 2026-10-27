@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { parseTheme, resolveTheme, type ThemePref } from "./theme";
 
 /** One localStorage entry for the layout choices: top menu and piano open/closed. */
 export const UI_KEY = "hh.ui.v1";
@@ -8,9 +9,11 @@ export interface UiPrefs {
   pianoOpen: boolean;
   /** Hover panel: the "Más" part (armonía, suenan ahora, melodía) is open. */
   tipMore: boolean;
+  /** Claro / Oscuro / Automático (follows the Mac). */
+  theme: ThemePref;
 }
 
-const DEFAULTS: UiPrefs = { menuOpen: true, pianoOpen: true, tipMore: false };
+const DEFAULTS: UiPrefs = { menuOpen: true, pianoOpen: true, tipMore: false, theme: "auto" };
 
 export function parseUiPrefs(raw: string | null): UiPrefs {
   if (!raw) return DEFAULTS;
@@ -20,6 +23,7 @@ export function parseUiPrefs(raw: string | null): UiPrefs {
       menuOpen: typeof o?.menuOpen === "boolean" ? o.menuOpen : DEFAULTS.menuOpen,
       pianoOpen: typeof o?.pianoOpen === "boolean" ? o.pianoOpen : DEFAULTS.pianoOpen,
       tipMore: typeof o?.tipMore === "boolean" ? o.tipMore : DEFAULTS.tipMore,
+      theme: parseTheme(o?.theme),
     };
   } catch {
     return DEFAULTS;
@@ -87,5 +91,23 @@ export function useUiPrefs() {
   const toggleMenu = useCallback(() => update({ menuOpen: !ref.current.menuOpen }), [update]);
   const togglePiano = useCallback(() => update({ pianoOpen: !ref.current.pianoOpen }), [update]);
 
-  return { ...prefs, animate, toggleMenu, togglePiano };
+  const setTheme = useCallback((theme: ThemePref) => update({ theme }), [update]);
+
+  // Put the theme on <html>; "auto" follows the Mac live.
+  useEffect(() => {
+    const mq = window.matchMedia?.("(prefers-color-scheme: dark)");
+    const apply = () => {
+      const t = resolveTheme(prefs.theme, !!mq?.matches);
+      const r = document.documentElement;
+      r.classList.toggle("dark", t === "dark");
+      r.setAttribute("data-theme", t);
+      r.style.colorScheme = t;
+    };
+    apply();
+    if (prefs.theme !== "auto" || !mq) return;
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, [prefs.theme]);
+
+  return { ...prefs, animate, toggleMenu, togglePiano, setTheme };
 }

@@ -107,6 +107,10 @@ export function MiniStaff({ notes, clef, width = 240, height = 70, columns, aria
         if (n.glyphOnly) {
           return (
             <text
+              onClick={n.onClick ? () => n.onClick!() : undefined}
+              style={n.onClick ? { cursor: "pointer" } : undefined}
+              role={n.onClick ? "button" : undefined}
+              aria-label={n.onClick ? n.ariaLabel : undefined}
               key={`${n.spelled}-${i}`}
               x={x}
               y={y + h * 1.0}
@@ -169,7 +173,7 @@ export function MiniStaff({ notes, clef, width = 240, height = 70, columns, aria
                 y={y + h * 0.95}
                 fontSize={h * 4.6}
                 textAnchor="end"
-                fill={INK}
+                fill={n.fill ?? INK}
                 opacity={op}
                 aria-hidden
                 data-testid="mini-staff-accidental"

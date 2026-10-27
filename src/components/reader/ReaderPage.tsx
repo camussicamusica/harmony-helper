@@ -43,6 +43,10 @@ import {
 import { useUiPrefs } from "@/lib/ui/uiPrefs";
 import { useAlwaysLabels, useLineMode } from "@/lib/music/lineMode";
 import { applyInterfaceVars } from "@/lib/colors/store";
+import { LibrarySheet } from "@/components/reader/LibrarySheet";
+import { useLibrary } from "@/lib/library/useLibrary";
+import { detectKeyFromNotes } from "@/lib/music/analysis/key";
+import { displayTitle, xmlTitle } from "@/lib/library/entry";
 import type { IsolationMode, ScheduledNote, ScoreView as ViewMode } from "@/lib/music/types";
 
 const VIEW_KEY = "hh.view.v1";
@@ -84,6 +88,10 @@ export function ReaderPage() {
   const [isolation, setIsolationState] = useState<IsolationMode>("both");
   const [isPlaying, setIsPlaying] = useState(false);
   const [zoom, setZoom] = useState(1);
+  const [centerNonce, setCenterNonce] = useState(0);
+  const library = useLibrary();
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [filename, setFilename] = useState("");
   const [line, setLine] = useState(false);
   const [intervals, setIntervals] = useAlwaysLabels();
   const [lineMode, setLineMode] = useLineMode();
@@ -130,6 +138,22 @@ export function ReaderPage() {
   const recorrido = useRecorrido(scoreHash);
   const chordNamesLayer = useChordNamesLayer();
   const ficha = useFicha(xml, scoreData, bpm, fichaOpen || recorridoOpen || chordNamesLayer.options.on);
+  const libEntry = library.entries.find((e) => e.id === scoreHash);
+  const pageTitle =
+    libEntry?.titleOverride || xmlTitle(xml) || filename ? displayTitle({ titleOverride: libEntry?.titleOverride, title: xmlTitle(xml), filename }) : null;
+  // The Biblioteca shows the detected key once the analysis has it.
+  const keyLabelNow = useMemo(() => {
+    if (!scoreData?.notes.length) return undefined;
+    try {
+      return detectKeyFromNotes(scoreData.notes, scoreData.meta.fifths).best.key.label;
+    } catch {
+      return undefined;
+    }
+  }, [scoreData]);
+  useEffect(() => {
+    if (libEntry && keyLabelNow && libEntry.keyLabel !== keyLabelNow) void library.patch(libEntry.id, { keyLabel: keyLabelNow });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [libEntry?.id, libEntry?.keyLabel, keyLabelNow]);
   const patternLayer = usePatternLayer(scoreHash, scoreData);
   const degradeLayer = useDegradeLayer();
   const [degradeCap, setDegradeCap] = useState(1);
@@ -199,13 +223,17 @@ export function ReaderPage() {
   useEffect(() => {
     try {
       const v = localStorage.getItem(VIEW_KEY);
-      if (v === "tocar" || v === "estudiar") setViewState(v);
+      if (v === "tocar" || v === "estudiar" || v === "hoja") setViewState(v);
     } catch {
       /* ignore */
     }
     const last = loadLastScore();
     const startXml = last?.xml ?? xml;
-    if (last) setXml(last.xml);
+    if (last) {
+      setXml(last.xml);
+      setFilename(last.filename);
+      void library.record(last.xml, last.filename); // first run: hh.lastScore.v1 moves into the library too
+    }
     setViewReady(true);
     try {
       const start = resolveInitialBpm(loadSavedTempo(localStorage, hashText(startXml)), parseWrittenTempo(startXml));
@@ -294,7 +322,7 @@ export function ReaderPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Keys "m" (top menu) and "p" (piano) show/hide them, unless she is typing somewhere.
+  // Keys "m" (top menu) and "p" (piano) show/hide them, "c" centers the score, unless she is typing somewhere.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented || e.repeat) return;
@@ -307,6 +335,9 @@ export function ReaderPage() {
       } else if (k === "p") {
         e.preventDefault();
         uiRef.current.togglePiano();
+      } else if (k === "c") {
+        e.preventDefault();
+        setCenterNonce((n) => n + 1);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -315,6 +346,8 @@ export function ReaderPage() {
 
   const handleScoreLoaded = (musicXml: string, filename: string) => {
     saveLastScore(musicXml, filename);
+    setFilename(filename);
+    void library.record(musicXml, filename);
     handleStop();
     if (bpmTimer.current) clearTimeout(bpmTimer.current);
     bpmTimer.current = null;
@@ -430,6 +463,11 @@ export function ReaderPage() {
         onBpmChange={handleBpmChange}
         onIsolationChange={setIsolationState}
         onZoomChange={(z) => setZoom(clampZoom(z))}
+        onCenter={() => setCenterNonce((n) => n + 1)}
+        libraryOpen={libraryOpen}
+        theme={ui.theme}
+        onThemeChange={ui.setTheme}
+        onLibraryToggle={() => setLibraryOpen((v) => !v)}
         onViewChange={setView}
         onLineChange={setLine}
         onIntervalsChange={setIntervals}
@@ -450,6 +488,8 @@ export function ReaderPage() {
               bpm={bpm}
               isolation={isolation}
               zoom={zoom}
+              centerNonce={centerNonce}
+              title={pageTitle}
               view={view}
               line={line}
               intervals={intervals}
@@ -461,7 +501,7 @@ export function ReaderPage() {
               occurrenceMark={cursor.current ? cursor.current.index : null}
               highlightChords={highlightIdx}
               focusChord={focusChord}
-              rightInset={view === "estudiar" ? fichaInset : 0}
+              rightInset={view !== "tocar" ? fichaInset : 0}
               hardMeasures={recorrido.progress.hard}
               markMode={markMode}
               onToggleHardMeasure={recorrido.toggleHard}
@@ -493,6 +533,13 @@ export function ReaderPage() {
         onHighlightChange={setHighlight}
         onFocusChord={(index) => setFocusChord({ index, nonce: Date.now() })}
         focus={fichaFocus}
+      />
+      <LibrarySheet
+        open={libraryOpen}
+        onOpenChange={setLibraryOpen}
+        library={library}
+        currentId={scoreHash}
+        onOpenEntry={(e) => handleScoreLoaded(e.xml, e.filename)}
       />
       <RecorridoPanel
         open={recorridoOpen}

@@ -25,6 +25,7 @@ const btn =
 export function KeyPanel({ view }: { view: KeySigView }) {
   const { palette } = useColors();
   const none = view.accidentals.length === 0;
+  const play = useMemo(() => keyPlayMidis(view.key, view.accidentals), [view]);
   const glyphs = useMemo<MiniStaffNote[]>(
     () =>
       view.accidentals.map((n, i) => {
@@ -40,12 +41,13 @@ export function KeyPanel({ view }: { view: KeySigView }) {
           col: i,
           glyphOnly: true,
           fill: headFill(spelledPc(n), palette.roles),
+          ariaLabel: `Tocar ${n}`,
+          onClick: () => void playNoteMidi(play.altered.find((a) => a.name === n)?.midi ?? 60),
         };
       }),
-    [view, palette.roles],
+    [view, palette.roles, play],
   );
   const scale = useMemo(() => buildKeyScaleView(view.key, view.clef, view.accidentals), [view]);
-  const play = useMemo(() => keyPlayMidis(view.key, view.accidentals), [view]);
 
   return (
     <div data-testid="key-panel">

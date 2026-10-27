@@ -32,12 +32,14 @@ Nota: toda la app está en español (Argentina). Todo está escrito acá tal cua
 
 Para encenderla:
 
-1. Abrí la Terminal.
-2. Escribí `cd ~/code/harmony-helper` y apretá Enter. (Esto te lleva a la carpeta de la app.)
-3. Escribí `~/.bun/bin/bun run dev --port 5190` y apretá Enter. (Enciende el servidor.)
+1. Primero abrí localhost:5190 en Chrome. Si carga, la app ya está prendida: no hace falta la Terminal.
+2. Si no carga, abrí la Terminal.
+3. Escribí `cd ~/code/harmony-helper && ~/.bun/bin/bun run dev --port 5190 --strictPort` y apretá Enter. (Te lleva a la carpeta de la app y enciende el servidor.)
 4. Esperá a que aparezca `http://localhost:5190`. Usá siempre el puerto 5190: tus colores y ajustes se guardan por dirección, y con otro número la app arranca vacía.
 5. Abrí esa dirección en Chrome.
 6. Esperá unos segundos: la partitura tarda en dibujarse.
+
+Si la Terminal dice que el puerto está en uso, la app ya está prendida: abrí localhost:5190.
 
 Para apagarla: en la Terminal apretá Ctrl + C.
 
@@ -99,13 +101,13 @@ Qué esperar:
 
 ## 3. Tocar vs Estudiar
 
-Son dos modos de ver la partitura. Los botones están arriba a la izquierda.
+Son tres modos de ver la partitura: "Tocar", "Estudiar" y "Hoja". Los botones están arriba a la izquierda.
 
 **"Tocar":**
 1. La partitura es una sola línea larga que se desliza de costado.
 2. Hay una raya vertical fija. Al reproducir, la partitura se mueve y la nota actual pasa por esa raya.
 3. El piano se ve abajo, centrado. Podés esconderlo (ver 3.1).
-4. Cuando está en pausa, podés arrastrar la partitura con el mouse hacia los lados.
+4. Podés arrastrar la partitura con el mouse hacia los costados y también hacia arriba y abajo (ver 3.3).
 
 **"Estudiar":**
 1. Ves la partitura entera, en renglones, como en papel.
@@ -142,6 +144,48 @@ La app recuerda si dejaste el menú y el piano escondidos o visibles.
 3. Si el archivo es muy grande (más de 2 millones de letras), no se guarda y al recargar vuelve la partitura de ejemplo.
 
 ---
+
+### 3.3 Mover la partitura y centrarla (con cualquier zoom)
+
+**Arrastrar en "Tocar":**
+1. Apretá el botón izquierdo del mouse sobre la partitura y no lo sueltes. El cursor se vuelve una mano cerrada.
+2. Mové el mouse hacia donde quieras llevar la partitura: arriba, abajo, izquierda o derecha.
+3. Soltá el botón.
+4. En el trackpad también podés deslizar con dos dedos.
+5. Al arrastrar no aparece el cartelito de la nota ni se tocan los acordes por error.
+6. Si estás reproduciendo, la partitura sigue avanzando de costado sola; la altura queda donde la pusiste.
+
+**Arrastrar en "Estudiar" y "Hoja":**
+1. Mové el mouse a un lugar vacío de la partitura (entre los renglones, no sobre una nota ni sobre un texto).
+2. Apretá el botón izquierdo y arrastrá. La página sube, baja o se mueve de costado.
+3. Para arrastrar desde cualquier lugar, mantené apretada la barra espaciadora y arrastrá. (Así el texto se sigue pudiendo seleccionar y los clics siguen funcionando.)
+
+**Centrado automático al hacer zoom:**
+1. En el menú, mové "Zoom" o tocá "−" y "+".
+2. En "Tocar", el pentagrama queda en el medio de la pantalla, aunque sea más alto que el espacio.
+3. La nota que estaba bajo la raya vertical sigue bajo la raya. En "Estudiar", sigue en el medio de la pantalla.
+
+**Botón "Centrar":**
+1. Si arrastraste la partitura y te perdiste, tocá "Centrar" (al lado del zoom) o apretá la tecla "c".
+2. En "Tocar", el pentagrama vuelve al medio y la nota actual vuelve a la raya.
+3. En "Estudiar" y "Hoja", se centra de costado y trae a la vista el renglón que estaba en el medio.
+4. La tecla "c" no funciona si estás escribiendo en un cuadro de texto.
+
+### 3.4 "Hoja": la partitura como papel
+
+1. Arriba a la izquierda, tocá "Hoja" (al lado de "Estudiar").
+2. Vas a ver páginas blancas, una debajo de la otra, sobre un fondo gris claro. Debajo de cada una dice "Página 1 de 3", etc.
+3. Los renglones y los cortes de página son los de tu papel cuando el archivo los trae (los archivos pasados con Audiveris suelen traerlos). Así podés ordenarte con la hoja que tenés en la mano.
+4. Si el archivo no trae los cortes, arriba aparece: "Esta partitura no trae los cortes del papel; la app los calculó." Los renglones los acomoda la app.
+5. El título de la página es el nombre que le pusiste en la Biblioteca; si no hay, el título del archivo; si no hay, el nombre del archivo sin la extensión.
+6. Todo lo demás funciona sobre las páginas: pasar el mouse por las notas, los colores, las cajas de patrones, los nombres de acordes, "Recorrer un acorde", "Zoom", arrastrar y "Centrar".
+7. La app recuerda el modo que elegiste.
+
+### 3.5 Sonidos al hacer clic
+
+1. En la partitura, un clic (sin mover el mouse) sobre una nota la toca. Si arrastrás, solo mueve la partitura.
+2. En la tarjeta de una nota: un clic en la foto de la nota, en el chip "NOTA" o en los chips de "Su figura" y "Armonía" toca esa nota. Un clic en el nombre del acorde toca el acorde.
+3. En la tarjeta de la armadura: un clic en un ♯ o ♭ dibujado toca la nota alterada (Fa♯, Do♯). Un clic en una nota de la escala dibujada la toca.
 
 ## 4. Reproducir, tempo, manos
 
@@ -665,3 +709,60 @@ Los pasos 4 (oído interno), 8 (improvisar), 9 (sacar un motivo), 10 (componer) 
    - Paso 10: **componer 4 compases**.
    - Paso 11: **tarjetas** que se tocan, repetidas a días espaciados.
 10. **Ubicar la pieza en el círculo de quintas** (parte del paso 3): no existe, ver el punto 1.
+
+---
+
+## 12. Biblioteca: tus partituras guardadas
+
+**Qué es:** la lista de todas las partituras que abriste en la app. Se guardan solas, así no tenés que volver a subirlas. Quedan en este navegador (Chrome, localhost:5190), no en la nube.
+
+**Abrir una de la lista:**
+1. En el menú de arriba, tocá "Biblioteca" (al lado de "Abrir partitura"). Si no ves el menú, tocá "Mostrar menú".
+2. Se abre un panel a la derecha, con la última partitura abierta primero.
+3. Tocá una fila para abrir esa partitura. La que está abierta ahora dice "abierta".
+4. Cada fila muestra el título, el compositor, la tonalidad, los compases y "abierta hace 2 días".
+
+**Buscar:**
+1. Escribí en el cuadro "Buscar por título, compositor o archivo".
+2. La lista se achica a medida que escribís. No importan las mayúsculas ni los acentos.
+
+**Cambiar el título:**
+1. En la fila, tocá el lápiz.
+2. Escribí el nombre nuevo y apretá "Guardar". Ese nombre se usa también como título en "Hoja".
+
+**Quitar una partitura de la lista:**
+1. En la fila, tocá el tachito.
+2. Aparece un cartel que te pregunta si querés quitarla. Tu archivo original en la computadora NO se toca ni se borra.
+3. Tocá "Quitar de la biblioteca" para confirmar, o "Cancelar".
+4. Si más adelante abrís ese archivo otra vez, vuelve a quedar guardado.
+
+**Copia de seguridad (importante):**
+1. El navegador puede borrar lo que guarda (si limpiás los datos de Chrome, por ejemplo). Por eso, de vez en cuando tocá "Exportar biblioteca". Se descarga un archivo .json.
+2. Guardá ese archivo en un lugar seguro.
+3. Para recuperarlo, tocá "Importar biblioteca" y elegí el archivo .json. Se suman las partituras que falten; no se duplica ninguna.
+
+**Si abrís dos veces la misma partitura:** no se duplica; solo se actualiza "abierta hace...".
+
+---
+
+## 13. Tema claro / oscuro
+
+1. Arriba a la derecha, al lado de "Ocultar menú", está el botón con un sol, una luna o una pantalla.
+2. Tocalo para cambiar. Va pasando por: "Claro" (sol), "Oscuro" (luna) y "Automático" (pantalla).
+3. "Automático" sigue el modo de tu Mac. Es lo que viene por defecto.
+4. "Claro" es papel y tinta: fondo crema, letras oscuras y un azul noche para los botones principales.
+5. "Oscuro" es grafito con un dorado suave para los botones principales.
+6. En los dos temas la partitura se ve negra sobre una hoja clara, y los colores de las notas no cambian.
+7. La app recuerda tu elección.
+
+## 14. Colores de los sostenidos y bemoles
+
+1. Cada ♯, ♭ o ♮ que está delante de una nota se pinta con el color de esa nota (el Fa♯ con el color de Fa♯).
+2. Los ♯ y ♭ del principio (la armadura) se pintan con el color de la nota que alteran: el ♯ de la línea del Fa con el color de Fa♯, el de la línea del Do con el de Do♯.
+3. Si apagaste el color de una nota (ver 5.1), su alteración queda negra.
+4. Lo mismo se ve en las tarjetas de la armadura y de la escala.
+
+## 15. Cajas de patrones al principio del renglón
+
+1. Cuando una caja de patrón empieza en el primer compás de un renglón, ahora arranca después de la clave, la armadura y el compás. Ya no tapa los ♯ ni los ♭.
+2. Podés pasar el mouse por la armadura para ver su cartelito ("Re mayor · 2 ♯") aunque haya cajas encendidas.
