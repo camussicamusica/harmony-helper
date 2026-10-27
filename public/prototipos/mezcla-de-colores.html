@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prototipo: mezcla de colores</title>
+<style>
+:root{--bg:#f6f5f2;--card:#fff;--ink:#1f2430;--mute:#6a7080;--line:#e3e1db;--acc:#3b5bdb;--ok:#2f7d4f;--bad:#b4472f}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+.wrap{max-width:1000px;margin:0 auto;padding:20px 20px 80px}
+.proto{background:#fff7e0;border:1px solid #ecd9a0;border-radius:10px;padding:8px 14px;font-size:14px;color:#6b5412;margin-bottom:16px}
+h1{font-size:24px;margin:6px 0 4px}
+h2{font-size:18px;margin:0 0 4px}
+p.sub{color:var(--mute);margin:0 0 12px;font-size:14px}
+section{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin:16px 0}
+.src{font-size:13px;color:var(--mute)}
+button{font:inherit;border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 12px;cursor:pointer;color:var(--ink)}
+button:hover{border-color:#b9b6ac}
+button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.piano{position:relative;height:150px;width:336px;max-width:100%;margin:10px 0;user-select:none}
+.wk{position:absolute;top:0;width:48px;height:150px;border:1px solid #888;border-radius:0 0 6px 6px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:6px;font-size:11px;font-weight:600;text-align:center;cursor:pointer;line-height:1.1}
+.bk{position:absolute;top:0;width:30px;height:92px;border:1px solid #222;border-radius:0 0 5px 5px;z-index:2;display:flex;align-items:flex-end;justify-content:center;padding-bottom:4px;font-size:9px;font-weight:600;text-align:center;cursor:pointer;line-height:1.1}
+.wk:hover,.bk:hover{filter:brightness(.94)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;min-height:34px;margin:6px 0}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:3px 4px 3px 10px;background:#fafaf8;font-size:14px}
+.chip i{width:14px;height:14px;border-radius:50%;border:1px solid rgba(0,0,0,.2);display:inline-block}
+.chip button{padding:0 7px;border-radius:999px;line-height:1.4}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:18px}
+.m h3{font-size:15px;margin:0 0 2px}
+.m .ex{font-size:12.5px;color:var(--mute);min-height:36px;margin:0 0 6px}
+.box{position:relative;width:220px;height:120px;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--paper)}
+.box .bg{position:absolute;inset:0;opacity:var(--int)}
+.box svg.notes{position:absolute;inset:0;width:100%;height:100%}
+.flex{display:flex;height:100%}.flex div{height:100%}
+.badge{display:inline-block;margin-top:6px;font-size:12px;border-radius:999px;padding:1px 9px;border:1px solid}
+.badge.ok{color:var(--ok);border-color:#b8dcc6;background:#f1faf4}
+.badge.bad{color:var(--bad);border-color:#efc3b8;background:#fdf3f0}
+.ctl{display:flex;flex-wrap:wrap;gap:22px;align-items:center}
+input[type=range]{accent-color:var(--acc);width:200px}
+.staffwrap{background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:6px;overflow-x:auto}
+.sw{display:inline-flex;gap:0;border-radius:6px;overflow:hidden;border:1px solid var(--line);cursor:pointer;vertical-align:middle}
+.sw b{width:18px;height:22px;display:block}
+.saved{display:flex;flex-wrap:wrap;gap:10px;margin-top:8px}
+.saved span.x{font-size:11px;color:var(--mute);cursor:pointer;margin-left:3px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="proto">Prototipo: nada de esto cambia la app todavía.</div>
+<h1>Mezcla de colores de las notas</h1>
+<p class="sub">Así se verían los colores de varias notas juntas dentro de una caja. <span class="src" id="src"></span></p>
+
+<section id="s-controls">
+  <h2>Controles</h2>
+  <div class="ctl">
+    <label>Intensidad del fondo: <b id="intv">70%</b><br><input type="range" id="int" min="15" max="100" value="70"></label>
+    <div>Fondo de la partitura<br><button id="p-blanco" class="on">blanco</button> <button id="p-crema">crema</button></div>
+    <label><input type="checkbox" id="showNotes" checked> Mostrar notas encima</label>
+  </div>
+</section>
+
+<section>
+  <h2>1. Elegir notas</h2>
+  <p class="sub">Tocá una tecla para sumarla a la caja. Si la tocás de nuevo, pesa más (dura más).</p>
+  <div class="piano" id="piano"></div>
+  <div class="chips" id="chips"></div>
+  <div class="row" id="presets"></div>
+</section>
+
+<section>
+  <h2>2. Ocho maneras de mezclar</h2>
+  <p class="sub">Cada caja muestra las mismas notas. La etiqueta dice si las notas negras se leen bien encima.</p>
+  <div class="grid" id="grid"></div>
+</section>
+
+<section>
+  <h2>3. Cajas de patrones</h2>
+  <p class="sub">Los compases 1 y 3 son iguales, así que comparten color. Cada carga de la página sortea colores nuevos.</p>
+  <div class="row">
+    <label><input type="checkbox" id="pbox" checked> Mostrar cajas</label>
+    <button id="reroll">Otra combinación</button>
+    <button id="like">Me gusta esta</button>
+    <span id="cur" class="sw"></span>
+  </div>
+  <div class="staffwrap" style="margin-top:10px"><svg id="staff" viewBox="0 0 800 130" width="100%"></svg></div>
+  <p class="sub" style="margin-top:12px">Combinaciones guardadas</p>
+  <div class="saved" id="saved"></div>
+</section>
+</div>
+
+<script>
+"use strict";
+/* ---------- color math ---------- */
+const hex2rgb=h=>{h=h.replace('#','');return[0,2,4].map(i=>parseInt(h.substr(i,2),16)/255)};
+const rgb2hex=c=>'#'+c.map(v=>Math.round(Math.min(1,Math.max(0,v))*255).toString(16).padStart(2,'0')).join('').toUpperCase();
+const s2l=v=>v<=0.04045?v/12.92:Math.pow((v+0.055)/1.055,2.4);
+const l2s=v=>v<=0.0031308?12.92*v:1.055*Math.pow(v,1/2.4)-0.055;
+const toLin=c=>c.map(s2l), toSrgb=c=>c.map(l2s);
+function lin2lab([r,g,b]){
+  const l=Math.cbrt(0.4122214708*r+0.5363325363*g+0.0514459929*b);
+  const m=Math.cbrt(0.2119034982*r+0.6806995451*g+0.1073969566*b);
+  const s=Math.cbrt(0.0883024619*r+0.2817188376*g+0.6299787005*b);
+  return[0.2104542553*l+0.7936177850*m-0.0040720468*s,1.9779984951*l-2.4285922050*m+0.4505937099*s,0.0259040371*l+0.7827717662*m-0.8086757660*s];
+}
+function lab2lin([L,a,b]){
+  const l=(L+0.3963377774*a+0.2158037573*b)**3,m=(L-0.1055613458*a-0.0638541728*b)**3,s=(L-0.0894841775*a-1.2914855480*b)**3;
+  return[4.0767416621*l-3.3077115913*m+0.2309699292*s,-1.2684380046*l+2.6097574011*m-0.3413193965*s,-0.0041960863*l-0.7034186147*m+1.7076147010*s];
+}
+const hexLab=h=>lin2lab(toLin(hex2rgb(h)));
+const labHex=lab=>rgb2hex(toSrgb(lab2lin(lab).map(v=>Math.min(1,Math.max(0,v)))));
+function oklch2hex(L,C,h){const r=h*Math.PI/180;return labHex([L,C*Math.cos(r),C*Math.sin(r)])}
+const lum=h=>{const[r,g,b]=toLin(hex2rgb(h));return 0.2126*r+0.7152*g+0.0722*b};
+const contrastBlack=L=>(L+0.05)/0.05;
+function blend(fg,bg,a){const f=hex2rgb(fg),b=hex2rgb(bg);return rgb2hex(f.map((v,i)=>v*a+b[i]*(1-a)))}
+
+/* mix a: weighted average in OKLab */
+function mixLight(items){
+  const T=items.reduce((s,i)=>s+i.w,0);let acc=[0,0,0];
+  items.forEach(i=>{const l=hexLab(i.color);acc=acc.map((v,k)=>v+l[k]*i.w/T)});
+  return labHex(acc);
+}
+/* mix b: weighted geometric mean of linear reflectances */
+function mixPaint(items){
+  const T=items.reduce((s,i)=>s+i.w,0);const acc=[0,0,0];
+  items.forEach(i=>{toLin(hex2rgb(i.color)).forEach((v,k)=>{acc[k]+=Math.log(Math.max(v,0.002))*i.w/T})});
+  return rgb2hex(toSrgb(acc.map(Math.exp)));
+}
+
+/* ---------- note colors ---------- */
+const NAMES=["Do","Do♯","Re","Re♯","Mi","Fa","Fa♯","Sol","Sol♯","La","La♯","Si"];
+const LAT=["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+const FACTORY=["#E53935","#C62E2B","#F9C81E","#C2A11A","#7EC8F2","#8B5A2B","#6B4620","#1E5FBF","#174B97","#F06292","#C0507A","#8E24AA"];
+// darken(natural below, 0.12) placeholders for sharps are approximated above; replaced below if storage has them
+let colors=FACTORY.slice(),source="fabrica";
+try{
+  const raw=localStorage.getItem("hh.colors.v1");
+  if(raw){
+    const st=JSON.parse(raw);const p=(st.versions||[]).find(v=>v.id===st.currentId)||(st.versions||[])[0];
+    if(p){let n=0;for(let pc=0;pc<12;pc++){const r=p.roles.find(r=>r.id==="note-"+pc);if(r&&/^#[0-9a-f]{6}$/i.test(r.color)){colors[pc]=r.color.toUpperCase();n++}}
+      if(n===12)source="guardados"}
+  }
+}catch(e){console.warn("No pude leer hh.colors.v1",e)}
+if(source!=="guardados")colors=FACTORY.slice();
+console.log("[mezcla] fuente de colores:",source,colors);
+document.getElementById("src").textContent=source==="guardados"?"Usando tus colores guardados.":"Usando los colores de fábrica.";
+
+/* ---------- state ---------- */
+let seq=[{pc:0,w:1},{pc:2,w:1},{pc:4,w:1}];
+let paper="#FFFFFF",inten=0.7,showNotes=true;
+const PRESETS=[
+ ["Do · Re · Mi",[[0],[2],[4]]],
+ ["Acorde de Do mayor (Do Mi Sol)",[[0],[4],[7]]],
+ ["Escala de Do mayor",[0,2,4,5,7,9,11].map(x=>[x])],
+ ["Do Re Mi con Do largo",[[0,3],[2],[4]]],
+ ["Un compás de ejemplo: Sol Si Re Sol",[[7],[11],[2],[7]]],
+ ["Notas lejanas (Do y Fa#)",[[0],[6]]],
+];
+const $=id=>document.getElementById(id);
+const textOn=h=>lum(h)>0.35?"#111":"#fff";
+
+/* ---------- piano ---------- */
+const WHITE=[0,2,4,5,7,9,11], BLACK={1:36,3:84,6:180,8:228,10:276}; // left px
+(function buildPiano(){
+  const p=$("piano");
+  WHITE.forEach((pc,i)=>{const d=document.createElement("div");d.className="wk";d.style.left=i*48+"px";d.style.background=colors[pc];d.style.color=textOn(colors[pc]);d.innerHTML=`${NAMES[pc]}<br>(${LAT[pc]})`;d.onclick=()=>addNote(pc);p.appendChild(d)});
+  Object.entries(BLACK).forEach(([pc,x])=>{pc=+pc;const d=document.createElement("div");d.className="bk";d.style.left=x+"px";d.style.background=colors[pc];d.style.color=textOn(colors[pc]);d.innerHTML=`${NAMES[pc]}<br>(${LAT[pc]})`;d.onclick=()=>addNote(pc);p.appendChild(d)});
+})();
+function addNote(pc){const e=seq.find(s=>s.pc===pc);if(e)e.w++;else seq.push({pc,w:1});render()}
+PRESETS.forEach(([n,notes])=>{const b=document.createElement("button");b.textContent=n;b.onclick=()=>{seq=notes.map(([pc,w])=>({pc,w:w||1}));render()};$("presets").appendChild(b)});
+const clr=document.createElement("button");clr.textContent="Vaciar";clr.onclick=()=>{seq=[];render()};$("presets").appendChild(clr);
+
+function renderChips(){
+  const c=$("chips");c.innerHTML="";
+  if(!seq.length){c.innerHTML='<span class="src">Caja vacía. Tocá una tecla.</span>';return}
+  seq.forEach((s,i)=>{const d=document.createElement("span");d.className="chip";d.innerHTML=`<i style="background:${colors[s.pc]}"></i>${NAMES[s.pc]} ×${s.w}`;
+    const b=document.createElement("button");b.textContent="×";b.title="Quitar";b.onclick=()=>{seq.splice(i,1);render()};d.appendChild(b);c.appendChild(d)});
+}
+
+/* ---------- noteheads ---------- */
+const STEP={0:0,1:0,2:1,3:1,4:2,5:3,6:3,7:4,8:4,9:5,10:5,11:6};
+function noteheadsSVG(n,W=220,H=120){
+  if(!showNotes||!n)return"";
+  let s=`<svg class="notes" viewBox="0 0 ${W} ${H}">`;
+  for(let i=0;i<5;i++)s+=`<line x1="8" x2="${W-8}" y1="${34+i*12}" y2="${34+i*12}" stroke="#000" stroke-opacity=".25"/>`;
+  seq.forEach((e,i)=>{const x=24+(W-48)*(n===1?.5:i/(n-1));const y=82-STEP[e.pc]*6;
+    s+=`<ellipse cx="${x}" cy="${y}" rx="7.5" ry="5.5" fill="#000" transform="rotate(-18 ${x} ${y})"/>`});
+  return s+"</svg>";
+}
+
+/* ---------- methods ---------- */
+function items(){return seq.map(s=>({color:colors[s.pc],w:s.w}))}
+const methods=[
+ {n:"Mezcla de luz (promedio)",e:"Promedio de los colores en OKLab, pesado por duración. Un solo color liso.",
+  bg:it=>`<div class="bg" style="background:${mixLight(it)}"></div>`,cols:it=>[mixLight(it)],mix:1},
+ {n:"Mezcla de pintura",e:"Como mezclar pinturas: tiende a quedar más oscuro y apagado, a veces barroso.",
+  bg:it=>`<div class="bg" style="background:${mixPaint(it)}"></div>`,cols:it=>[mixPaint(it)],mix:1},
+ {n:"Degradé en el orden en que suenan",e:"Pasa de un color al siguiente; cada parada está según la duración acumulada.",
+  bg:it=>{const T=it.reduce((s,i)=>s+i.w,0);let c=0;const st=it.map(i=>{const p=((c+i.w/2)/T*100).toFixed(1);c+=i.w;return`${i.color} ${p}%`});
+    return`<div class="bg" style="background:${it.length>1?`linear-gradient(90deg,${st.join(',')})`:it[0].color}"></div>`},cols:it=>it.map(i=>i.color)},
+ {n:"Franjas iguales",e:"Una franja vertical por nota, todas del mismo ancho.",
+  bg:it=>`<div class="bg flex">${it.map(i=>`<div style="flex:1;background:${i.color}"></div>`).join('')}</div>`,cols:it=>it.map(i=>i.color)},
+ {n:"Franjas por duración",e:"El ancho de cada franja es proporcional a lo que dura la nota.",
+  bg:it=>`<div class="bg flex">${it.map(i=>`<div style="flex:${i.w};background:${i.color}"></div>`).join('')}</div>`,cols:it=>it.map(i=>i.color)},
+ {n:"Acuarela",e:"Manchas suaves que se superponen, de izquierda a derecha, con desenfoque.",
+  bg:(it,k)=>{const n=it.length,T=Math.max(...it.map(i=>i.w));
+    const defs=it.map((i,j)=>`<radialGradient id="rg${k}_${j}"><stop offset="0" stop-color="${i.color}" stop-opacity=".95"/><stop offset="1" stop-color="${i.color}" stop-opacity="0"/></radialGradient>`).join('');
+    const blobs=it.map((i,j)=>{const x=n===1?110:30+160*j/(n-1);const r=(55+25*i.w/T)*(n>4?.75:1);return`<circle cx="${x}" cy="60" r="${r}" fill="url(#rg${k}_${j})"/>`}).join('');
+    return`<svg class="bg" viewBox="0 0 220 120" preserveAspectRatio="none" style="width:100%;height:100%"><defs>${defs}<filter id="bl${k}" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="9"/></filter></defs><g filter="url(#bl${k})">${blobs}</g></svg>`},cols:it=>it.map(i=>i.color)},
+ {n:"Color principal + borde",e:"La nota que más pesa pinta la caja suave; las otras aparecen como puntos abajo.",
+  bg:it=>{const m=it.reduce((a,b)=>b.w>a.w?b:a);const others=it.filter(i=>i!==m);
+    return`<div class="bg" style="background:${m.color};opacity:calc(var(--int)*.45);box-shadow:none"></div><div class="bg" style="border:3px solid ${m.color}"></div><div class="bg" style="display:flex;gap:5px;align-items:flex-end;padding:0 0 6px 8px;opacity:1">${others.map(o=>`<i style="width:11px;height:11px;border-radius:50%;background:${o.color};border:1px solid rgba(0,0,0,.25)"></i>`).join('')}</div>`},
+  cols:it=>{const m=it.reduce((a,b)=>b.w>a.w?b:a);return[m.color]},k:.45},
+ {n:"Marco de colores",e:"Caja transparente con un marco grueso en tramos, uno por nota.",
+  bg:it=>{const T=it.reduce((s,i)=>s+i.w,0);let c=0;const st=it.map(i=>{const a=(c/T*100).toFixed(2),b=((c+i.w)/T*100).toFixed(2);c+=i.w;return`${i.color} ${a}% ${b}%`});
+    return`<div class="bg" style="border:12px solid;border-image:conic-gradient(from 0deg,${it.length>1?st.join(','):it[0].color+','+it[0].color}) 1"></div>`},cols:()=>[],frame:1},
+];
+
+function renderGrid(){
+  const g=$("grid");g.innerHTML="";const it=items();
+  methods.forEach((m,k)=>{
+    const d=document.createElement("div");d.className="m";
+    let inner="",badge="",ratio=21;
+    if(it.length){
+      inner=m.bg(it,k);
+      const a=inten*(m.k||1);
+      const cols=m.cols(it);
+      const Ls=cols.length?cols.map(c=>lum(blend(c,paper,a))):[lum(paper)];
+      ratio=contrastBlack(Math.min(...Ls));
+    }
+    const ok=ratio>=4.5;
+    badge=`<span class="badge ${ok?'ok':'bad'}" data-m="${k}" data-ratio="${ratio.toFixed(2)}">${ok?'se leen bien':'cuesta leer'} · ${ratio.toFixed(1)}:1</span>`;
+    d.innerHTML=`<h3>${"abcdefgh"[k]}. ${m.n}</h3><p class="ex">${m.e}</p><div class="box" data-method="${k}" style="--paper:${paper};--int:${inten}">${inner}${noteheadsSVG(it.length)}</div>${badge}`;
+    g.appendChild(d);
+  });
+}
+
+/* ---------- pattern demo ---------- */
+const KEY="hh.proto.patternPalettes.v1";
+let pal=[];
+function rollPalette(){
+  const n=3,h0=Math.random()*360,step=360/n;
+  const L=0.82+Math.random()*0.06,C=0.09+Math.random()*0.04;
+  pal=Array.from({length:n},(_,i)=>oklch2hex(L,C,(h0+i*step+(Math.random()-.5)*30)%360));
+  // shuffle assignment so the same hue is not always "pattern A"
+  pal.sort(()=>Math.random()-.5);
+}
+function loadSaved(){try{const v=JSON.parse(localStorage.getItem(KEY));return Array.isArray(v)?v:[]}catch(e){return[]}}
+function saveSaved(v){try{localStorage.setItem(KEY,JSON.stringify(v))}catch(e){console.warn(e)}}
+const MEAS=[[0,4,7,4],[2,5,9,5],[0,4,7,4],[11,7,2,7]]; // 1 and 3 identical
+const PATIDX=[0,1,0,2];
+function swatchEl(cols){const s=document.createElement("span");s.className="sw";cols.forEach(c=>{const b=document.createElement("b");b.style.background=c;s.appendChild(b)});return s}
+function renderStaff(){
+  const W=800,mw=190,x0=10,top=36;
+  let s="";
+  for(let i=0;i<5;i++)s+=`<line x1="${x0}" x2="${x0+mw*4}" y1="${top+i*10}" y2="${top+i*10}" stroke="#000" stroke-opacity=".45"/>`;
+  let boxes="",marks="";
+  MEAS.forEach((m,i)=>{
+    const x=x0+i*mw;
+    if($("pbox").checked)boxes+=`<rect x="${x+3}" y="${top-16}" width="${mw-6}" height="${72}" rx="8" fill="${pal[PATIDX[i]]}" opacity="${inten}"/>`;
+    marks+=`<line x1="${x+mw}" x2="${x+mw}" y1="${top}" y2="${top+40}" stroke="#000" stroke-opacity=".6"/>`;
+    m.forEach((pc,j)=>{const cx=x+30+j*40,cy=top+44-STEP[pc]*5-(pc>=7?0:0);
+      marks+=`<ellipse cx="${cx}" cy="${cy}" rx="6.5" ry="4.8" fill="#000" transform="rotate(-18 ${cx} ${cy})"/><line x1="${cx+6}" x2="${cx+6}" y1="${cy}" y2="${cy-26}" stroke="#000"/>`});
+    marks+=`<text x="${x+mw/2}" y="${top+80}" text-anchor="middle" font-size="11" fill="#777">compás ${i+1}</text>`;
+  });
+  $("staff").innerHTML=boxes+s+marks;
+  $("staff").parentElement.style.setProperty("--paper",paper);
+  const c=$("cur");c.innerHTML="";pal.forEach(h=>{const b=document.createElement("b");b.style.background=h;c.appendChild(b)});
+}
+function renderSaved(){
+  const el=$("saved");el.innerHTML="";const v=loadSaved();
+  if(!v.length){el.innerHTML='<span class="src">Todavía no guardaste ninguna.</span>';return}
+  v.forEach((cols,i)=>{const w=document.createElement("span");const s=swatchEl(cols);s.title="Usar esta";s.onclick=()=>{pal=cols.slice();renderStaff()};
+    const x=document.createElement("span");x.className="x";x.textContent="quitar";x.onclick=()=>{const a=loadSaved();a.splice(i,1);saveSaved(a);renderSaved()};
+    w.appendChild(s);w.appendChild(x);el.appendChild(w)});
+}
+$("reroll").onclick=()=>{rollPalette();renderStaff()};
+$("like").onclick=()=>{const a=loadSaved();if(!a.some(c=>c.join()===pal.join())){a.push(pal.slice());saveSaved(a)}renderSaved()};
+$("pbox").onchange=renderStaff;
+
+/* ---------- controls ---------- */
+$("int").oninput=e=>{inten=e.target.value/100;$("intv").textContent=e.target.value+"%";render()};
+$("showNotes").onchange=e=>{showNotes=e.target.checked;render()};
+function setPaper(c,id){paper=c;$("p-blanco").classList.toggle("on",id==="p-blanco");$("p-crema").classList.toggle("on",id==="p-crema");render()}
+$("p-blanco").onclick=()=>setPaper("#FFFFFF","p-blanco");
+$("p-crema").onclick=()=>setPaper("#FBF4E4","p-crema");
+
+function render(){renderChips();renderGrid();renderStaff()}
+rollPalette();renderSaved();render();
+// debug hook for verification
+window.__proto={mixLight,mixPaint,colors:()=>colors,source:()=>source,seqSet:(s)=>{seq=s;render()}};
+</script>
+</body>
+</html>

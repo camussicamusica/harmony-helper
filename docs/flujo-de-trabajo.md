@@ -31,6 +31,23 @@ Más dos cosas que cruzan todo:
 
 **La regla de oro:** cada herramienta termina en el teclado. Primero ver, después escuchar, después tocar. Mirar sin tocar no te saca de "pichi". Lo que sí te saca es reconocer rápido y tenerlo en los dedos (Mishra 2014; Macnamara 2014).
 
+## El ciclo de una clase: tocar → explicar → volver (Sofia, 2026-10-26)
+Lo tomó de una clase de un tumbao de timba en YouTube (https://www.youtube.com/watch?v=2MXXi9CEVJo; solo leímos lo que ella transcribió, no vimos el video). El profesor:
+1. **Muestra la pieza** entera: la toca.
+2. **Explica** la tonalidad (La menor) y la armonía: Tón La menor, Subd Re menor, Dom Mi mayor. Muestra la mano izquierda lento.
+3. **Vuelve a la canción**, ahora entendida.
+
+En la app es:
+1. **Partitura:** verla y escucharla.
+2. **Todas las formas de mirarla**, una capa por vez: colores de nota, intervalos, y **cajas de patrones**.
+3. **Explicación:** Ficha, Círculo, escala, progresión.
+4. **Volver a la partitura** con eso encima.
+
+**Cajas de patrones** (idea de Sofia): un grupo de notas que se repite, por ejemplo un compás igual a otro, queda dentro de una "cajita" de color de fondo, y el mismo patrón lleva siempre el mismo color.
+- Los colores de las cajas se eligen **al azar en cada partitura**, para que no se repitan entre partituras.
+- La excepción: si encuentra una combinación que le resulta cómoda, la puede guardar y reusar.
+- Antes de construirlo, se prueba en un prototipo cómo se mezclan los colores de las notas dentro de una caja: `public/prototipos/mezcla-de-colores.html`.
+
 ## Cuándo usar qué (según la situación)
 
 ### A. "Tengo una pieza nueva": el Recorrido de la pieza
