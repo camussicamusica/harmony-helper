@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronDown, Play, Square } from "lucide-react";
 import { ChordNoteChips } from "@/components/analysis/ChordNoteChips";
+import { RuleOfOctaveCard } from "@/components/analysis/RuleOfOctaveCard";
 import { ChordCircle, type CircleChord } from "@/components/analysis/ChordCircle";
 import { roleColor } from "@/lib/colors/roleColor";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -106,6 +107,7 @@ export function FichaPanel({
   const [circleSource, setCircleSource] = useState<"scale" | "piece">("scale");
   const [scaleIdx, setScaleIdx] = useState(0);
   const [pieceIdx, setPieceIdx] = useState(0);
+  const [octaveOpen, setOctaveOpen] = useState(false);
 
   const scale = useSevenths ? sevenths : triads;
   const groups = groupChords(chords);
@@ -255,6 +257,20 @@ export function FichaPanel({
                   </>
                 )}
               </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="ml-2 mt-3"
+                aria-pressed={octaveOpen}
+                onClick={() => setOctaveOpen((o) => !o)}
+              >
+                Regla de la octava
+              </Button>
+              {octaveOpen && (
+                <div className="mt-3">
+                  <RuleOfOctaveCard keyInfo={key} />
+                </div>
+              )}
             </Section>
 
             {/* b2. Círculo */}

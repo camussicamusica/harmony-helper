@@ -797,3 +797,27 @@ Los pasos 4 (oído interno), 8 (improvisar), 9 (sacar un motivo), 10 (componer) 
 4. Al cambiar cualquier opción se reparten cartas nuevas.
 
 **Qué todavía no está:** "Mazo de figuras", "Dictado rítmico" y "Cantar" aparecen en gris con la palabra "próximamente".
+
+---
+
+## 17. Regla de la octava
+
+**Qué es:** una receta para armonizar la escala en el bajo: el bajo sube y baja por la escala, y cada nota lleva su acorde. Solo el 1 y el 5 van en estado fundamental; los demás van invertidos.
+
+**Abrirla:**
+1. Tocá "Ficha" para abrir el panel.
+2. En la sección "Escala", tocá "Regla de la octava". Se abre una carta con la tonalidad de la pieza, por ejemplo "Regla de la octava · Re mayor".
+3. Tocá cualquiera de los 16 pasos de la fila ("sube" y "baja"). Suena el paso y arriba ves el acorde en el pentagrama (clave de Sol) y el bajo (clave de Fa).
+4. Tocá una nota de color de abajo para escucharla sola.
+
+**Escuchar:**
+1. Tocá "Escuchar". Suenan los 16 pasos, uno por tiempo, y se va marcando el paso que suena.
+2. Tocá "Parar" para cortar.
+
+**Practicar con el teclado:**
+1. Conectá el teclado con el botón "Conectar teclado MIDI" de arriba a la derecha (ver sección 9.1). Sin teclado, el botón "Practicar con el teclado" queda apagado y la carta sigue sirviendo para mirar y escuchar.
+2. Tocá "Practicar con el teclado". La app toca el bajo del primer paso y esconde el acorde.
+3. Tocá el acorde con la mano derecha, en cualquier octava. El bajo no hace falta.
+4. Cuando están todas las notas, el paso queda marcado con una tilde y la app pasa al siguiente.
+5. Si te trabás, tocá "Mostrar acorde". Aparecen las notas.
+6. Tocá "Repetir bajo" para volver a oír el bajo, o "Terminar" para salir. No hay puntos ni rachas.
