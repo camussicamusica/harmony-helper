@@ -34,7 +34,9 @@ Decidido con Sofia el 2026-10-29: **un modo dentro de la misma app**, no una cop
 - Panel de nota: "escrita Sol5 (G5) · suena Fa5 (F5)".
 - Interruptor "Color por: escrita / suena".
 
-## Paso 3 — Selector de instrumento y pistones dentro de la app
+## Paso 3 — Selector de instrumento y pistones dentro de la app — hecho 2026-10-29
+- Hecho: `src/lib/instrument/`, `src/components/trumpet/`, 588 pruebas. Sin pista en el archivo abre como Piano (nunca "el último usado"). Los pistones siguen primero la reproducción y después el mouse. Ya suenan en la nota real los clics del panel de nota, del primer plano y de la ficha (los chips, la escala, los acordes).
+- Falta: "Armonía" y "Suenan ahora" siguen visibles para una sola línea; con el panel de una nota fijado, los pistones siguen la reproducción igual.
 - `hh.instrument.v1` (piano | trompeta Si♭). Campo opcional `instrument` en cada entrada de la Biblioteca, sin migración.
 - Con trompeta: se esconden las manos, el teclado y el aviso de MIDI; aparece el componente de pistones (el del prototipo elegido) que sigue la reproducción y la nota bajo el mouse.
 - Panel de nota: pistones dibujados, parcial, alternativas, corredera.

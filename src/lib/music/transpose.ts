@@ -27,6 +27,14 @@ export function summarizeTranspose(parts: number[]): TransposeInfo {
   return { parts: clean, kind: "mixed", semitones: 0 };
 }
 
+/**
+ * Semitones to add to a pitch that analysis or the panels show (the written notes of a uniform score) to hear it.
+ * A mixed score is analysed at concert pitch already, so its panels need no shift.
+ */
+export function playbackShift(info?: TransposeInfo | null): number {
+  return info?.kind === "uniform" ? info.semitones : 0;
+}
+
 /** Sounding pitch of a note (its written pitch when the score does not transpose). */
 export function soundingOf(n: { midi: number; soundingMidi?: number }): number {
   return n.soundingMidi ?? n.midi;

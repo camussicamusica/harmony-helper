@@ -11,6 +11,7 @@ import { useColorBy, type ColorBy } from "@/lib/colors/colorBy";
 import { nextTheme, THEME_LABEL, type ThemePref } from "@/lib/ui/theme";
 import { UploadZone } from "./UploadZone";
 import { MidiControl } from "./MidiControl";
+import { INSTRUMENTS, type Instrument, type InstrumentId } from "@/lib/instrument/instrument";
 import { useLayersOpen } from "@/lib/music/analysis/useFicha";
 import type { ChordNamesLayer, DegradeLayer, PatternLayer } from "@/lib/music/analysis/usePatternLayer";
 import { ChordNamesControls, DegradeControls, PatternsControls } from "./LayerControls";
@@ -23,6 +24,9 @@ interface Props {
   scoreBpm: number;
   hasWrittenTempo: boolean;
   isolation: IsolationMode;
+  /** Instrument the score is studied on (trumpet hides the hands, the keyboard and MIDI). */
+  instrument: Instrument;
+  onInstrumentChange: (id: InstrumentId) => void;
   zoom: number;
   view: ScoreView;
   line: boolean;
@@ -73,6 +77,8 @@ export function TopBar({
   scoreBpm,
   hasWrittenTempo,
   isolation,
+  instrument,
+  onInstrumentChange,
   zoom,
   view,
   line,
@@ -209,6 +215,7 @@ export function TopBar({
       >
       <div className="-mx-1 min-h-0 overflow-hidden px-1">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 pt-1.5">
+      {instrument.hasHands && (
       <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
         {(["both", "rh", "lh"] as IsolationMode[]).map((m) => {
           const active = isolation === m;
@@ -231,6 +238,7 @@ export function TopBar({
           );
         })}
       </div>
+      )}
 
       <div className="ml-auto flex items-center gap-2">
         <UploadZone onScoreLoaded={onScoreLoaded} />
@@ -316,6 +324,25 @@ export function TopBar({
 
         <NoteColorStrip />
 
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground" role="group" aria-label="Instrumento" data-testid="instrument-select">
+          <span>Instrumento:</span>
+          <div className="flex items-center gap-0.5 rounded-md border border-border p-0.5">
+            {INSTRUMENTS.map((o) => (
+              <button
+                key={o.id}
+                type="button"
+                onClick={() => onInstrumentChange(o.id)}
+                aria-pressed={instrument.id === o.id}
+                className={`rounded px-2 py-0.5 text-xs ${
+                  instrument.id === o.id ? "bg-secondary text-secondary-foreground" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {hasTranspose && (
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground" role="group" aria-label="Color por" data-testid="color-by">
             <span>Color por:</span>
@@ -337,7 +364,7 @@ export function TopBar({
           </div>
         )}
 
-        <MidiControl />
+        {instrument.hasKeyboard && <MidiControl />}
 
         <Button
           size="sm"

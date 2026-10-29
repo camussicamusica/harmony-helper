@@ -1,3 +1,5 @@
+import { parseInstrumentId, type InstrumentId } from "@/lib/instrument/instrument";
+
 /** Biblioteca: pure logic (no browser APIs), so it can be tested. */
 
 export interface LibraryEntry {
@@ -16,6 +18,8 @@ export interface LibraryEntry {
   lastOpenedAt: number;
   /** Her own name for it (rename); wins over everything. */
   titleOverride?: string;
+  /** The instrument she chose for this score (absent: guess from the file). No IndexedDB migration: it is just a field. */
+  instrument?: InstrumentId;
 }
 
 function tag(xml: string, re: RegExp): string {
@@ -97,6 +101,7 @@ export function mergeLibraries(mine: readonly LibraryEntry[], theirs: readonly L
       addedAt: Math.min(m.addedAt, t.addedAt),
       lastOpenedAt: Math.max(m.lastOpenedAt, t.lastOpenedAt),
       titleOverride: m.titleOverride ?? t.titleOverride,
+      instrument: m.instrument ?? t.instrument,
       keyLabel: m.keyLabel || t.keyLabel,
       composer: m.composer || t.composer,
     });
@@ -164,5 +169,6 @@ export function parseLibraryJson(text: string): LibraryEntry[] {
       addedAt: Number.isFinite(e.addedAt) ? e.addedAt : 0,
       lastOpenedAt: Number.isFinite(e.lastOpenedAt) ? e.lastOpenedAt : 0,
       ...(typeof e.titleOverride === "string" && e.titleOverride ? { titleOverride: e.titleOverride } : {}),
+      ...(parseInstrumentId(e.instrument) ? { instrument: parseInstrumentId(e.instrument)! } : {}),
     }));
 }

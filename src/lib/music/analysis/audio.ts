@@ -23,22 +23,31 @@ async function getVoice(): Promise<Voice> {
 
 const freq = (midi: number) => Tone.Frequency(midi, "midi").toFrequency();
 
+/**
+ * Semitones added to every note played from the analysis panels (chips, scales, chords): a score for a transposing
+ * instrument shows written pitches, and what she hears must be what sounds. The reader sets it; 0 for everything else.
+ */
+let shiftSemitones = 0;
+export function setPlaybackShift(n: number) {
+  shiftSemitones = Number.isFinite(n) ? Math.round(n) : 0;
+}
+
 export function stopAnalysisAudio() {
   timers.forEach(clearTimeout);
   timers = [];
 }
 
 /** Play several MIDI notes together. */
-export async function playChordMidi(midis: number[], seconds = 1.6) {
+export async function playChordMidi(midis: number[], seconds = 1.6, shift = shiftSemitones) {
   stopAnalysisAudio();
   const v = await getVoice();
   const t = Tone.now() + 0.02;
-  for (const m of midis) v.triggerAttackRelease(freq(m), seconds, t);
+  for (const m of midis) v.triggerAttackRelease(freq(m + shift), seconds, t);
 }
 
 /** Play one MIDI note. */
-export async function playNoteMidi(midi: number, seconds = 0.9) {
-  await playChordMidi([midi], seconds);
+export async function playNoteMidi(midi: number, seconds = 0.9, shift = shiftSemitones) {
+  await playChordMidi([midi], seconds, shift);
 }
 
 /** Play MIDI notes one after the other. Resolves when the last note has been struck; `onStep(i)` fires as each starts. */
@@ -47,7 +56,7 @@ export async function playSequence(midis: number[], stepSec = 0.42, onStep?: (i:
   const v = await getVoice();
   const t0 = Tone.now() + 0.05;
   midis.forEach((m, i) => {
-    v.triggerAttackRelease(freq(m), stepSec * 1.6, t0 + i * stepSec);
+    v.triggerAttackRelease(freq(m + shiftSemitones), stepSec * 1.6, t0 + i * stepSec);
     if (onStep) timers.push(setTimeout(() => onStep(i), 50 + i * stepSec * 1000));
   });
   if (onEnd) timers.push(setTimeout(onEnd, 50 + midis.length * stepSec * 1000 + 200));
@@ -58,5 +67,5 @@ export async function playChordsInOrder(chords: number[][], gapSec = 1.2, second
   stopAnalysisAudio();
   const v = await getVoice();
   const t0 = Tone.now() + 0.02;
-  chords.forEach((c, i) => c.forEach((m) => v.triggerAttackRelease(freq(m), seconds, t0 + i * gapSec)));
+  chords.forEach((c, i) => c.forEach((m) => v.triggerAttackRelease(freq(m + shiftSemitones), seconds, t0 + i * gapSec)));
 }

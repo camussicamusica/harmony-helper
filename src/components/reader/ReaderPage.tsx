@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { TopBar } from "./TopBar";
 import { ScoreView } from "./ScoreView";
 import { PianoView } from "./PianoView";
+import { PistonsView } from "@/components/trumpet/PistonsView";
 import { FichaPanel, type FichaFocus } from "@/components/analysis/FichaPanel";
 import { RecorridoPanel } from "@/components/recorrido/RecorridoPanel";
 import { useRecorrido } from "@/lib/music/recorrido/useRecorrido";
@@ -46,7 +47,9 @@ import { applyInterfaceVars } from "@/lib/colors/store";
 import { LibrarySheet } from "@/components/reader/LibrarySheet";
 import { useLibrary } from "@/lib/library/useLibrary";
 import { detectKeyFromNotes } from "@/lib/music/analysis/key";
-import { analysisFifths, analysisNotes } from "@/lib/music/transpose";
+import { analysisFifths, analysisNotes, playbackShift } from "@/lib/music/transpose";
+import { setPlaybackShift } from "@/lib/music/analysis/audio";
+import { getInstrument, guessInstrument, pickInstrumentId, scanScoreInstruments, type InstrumentId } from "@/lib/instrument/instrument";
 import { displayTitle, xmlTitle } from "@/lib/library/entry";
 import type { IsolationMode, ScheduledNote, ScoreView as ViewMode } from "@/lib/music/types";
 
@@ -140,6 +143,24 @@ export function ReaderPage() {
   const chordNamesLayer = useChordNamesLayer();
   const ficha = useFicha(xml, scoreData, bpm, fichaOpen || recorridoOpen || chordNamesLayer.options.on);
   const libEntry = library.entries.find((e) => e.id === scoreHash);
+  // Instrument: what she picked for this score (right now, or saved in the Biblioteca), else what the file says, else piano.
+  // Never "the one she used last": a trumpet pick must not turn the next piano score into a trumpet.
+  const [pickedInstrument, setPickedInstrument] = useState<{ hash: string; id: InstrumentId } | null>(null);
+  const instrumentGuess = useMemo(() => guessInstrument(scanScoreInstruments(xml)), [xml]);
+  const instrumentId = pickInstrumentId(pickedInstrument?.hash === scoreHash ? pickedInstrument.id : libEntry?.instrument, instrumentGuess, "piano");
+  const instrument = getInstrument(instrumentId);
+  const handleInstrumentChange = (id: InstrumentId) => {
+    setPickedInstrument({ hash: scoreHash, id });
+    if (libEntry) void library.patch(libEntry.id, { instrument: id });
+  };
+  // One hand-less instrument plays everything with both: a hand chosen on the piano must not mute notes of a single line.
+  const effIsolation: IsolationMode = instrument.hasHands ? isolation : "both";
+  // A score for a transposing instrument shows written pitches; the panels' sound clicks must play what sounds.
+  const transposeInfo = scoreData?.meta.transpose;
+  useEffect(() => {
+    setPlaybackShift(playbackShift(transposeInfo));
+    return () => setPlaybackShift(0);
+  }, [transposeInfo]);
   const pageTitle =
     libEntry?.titleOverride || xmlTitle(xml) || filename ? displayTitle({ titleOverride: libEntry?.titleOverride, title: xmlTitle(xml), filename }) : null;
   // The Biblioteca shows the detected key once the analysis has it.
@@ -257,8 +278,8 @@ export function ReaderPage() {
   };
 
   useEffect(() => {
-    setIsolation(isolation);
-  }, [isolation]);
+    setIsolation(effIsolation);
+  }, [effIsolation]);
 
   const handlePlay = async () => {
     setLoopMeasure(null);
@@ -446,7 +467,9 @@ export function ReaderPage() {
         bpm={shownBpm}
         scoreBpm={scoreBpm}
         hasWrittenTempo={writtenTempo !== null}
-        isolation={isolation}
+        isolation={effIsolation}
+        instrument={instrument}
+        onInstrumentChange={handleInstrumentChange}
         zoom={zoom}
         view={view}
         line={line}
@@ -489,7 +512,8 @@ export function ReaderPage() {
               key={scoreVersion}
               xml={xml}
               bpm={bpm}
-              isolation={isolation}
+              isolation={effIsolation}
+              instrument={instrument}
               zoom={zoom}
               centerNonce={centerNonce}
               title={pageTitle}
@@ -519,12 +543,17 @@ export function ReaderPage() {
           )}
         </section>
         <section data-chrome="bottom" className={`shrink-0 bg-background ${tocar ? "" : "sticky bottom-0 z-20 border-t border-border"}`}>
-          <PianoView
-            isolation={isolation}
-            open={ui.pianoOpen}
-            animate={ui.animate}
-            onToggle={ui.togglePiano}
-          />
+          {instrument.hasKeyboard && (
+            <PianoView
+              isolation={effIsolation}
+              open={ui.pianoOpen}
+              animate={ui.animate}
+              onToggle={ui.togglePiano}
+            />
+          )}
+          {instrument.hasPistons && (
+            <PistonsView instrument={instrument} open={ui.pianoOpen} animate={ui.animate} onToggle={ui.togglePiano} />
+          )}
         </section>
       </main>
       <FichaPanel

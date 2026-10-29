@@ -19,6 +19,10 @@ import { buildGeometry } from "@/lib/music/melodicLine";
 import { pitchClassColor } from "@/lib/music/midiUtils";
 import { colorMidiOf, getColorBy, subscribeColorBy } from "@/lib/colors/colorBy";
 import { analysisFifths, analysisNotes, soundingOf, toConcert, writtenAndSounding } from "@/lib/music/transpose";
+import { applyInstrumentToSheet, PIANO, type Instrument } from "@/lib/instrument/instrument";
+import { PistonsDrawing } from "@/components/trumpet/PistonsDrawing";
+import { alternativesText, describeNote, slideText } from "@/components/trumpet/PistonsView";
+import { registerBand } from "@/lib/trumpet/fingerings";
 import {
   DISABLED_SEGMENT_COLOR,
   HALO_COLOR,
@@ -110,6 +114,8 @@ interface Props {
   onDegradeCap?: (cap: number) => void;
   /** Key of the piece (detected or chosen in the Ficha) for the hover panel; null = the panel detects it itself. */
   hoverKey?: KeyInfo | null;
+  /** Instrument the score is studied on: its transpose wins over the file's, and a trumpet gets its fingerings in the panel. */
+  instrument?: Instrument;
 }
 
 /** Hover zone over a key signature (or the empty gap where one would be) at the start of a staff. */
@@ -209,6 +215,7 @@ export function ScoreView({
   chordNames = null,
   onDegradeCap,
   hoverKey = null,
+  instrument = PIANO,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -226,6 +233,8 @@ export function ScoreView({
   bpmRef.current = bpm;
   const onNotesRef = useRef(onNotes);
   onNotesRef.current = onNotes;
+  const instrumentRef = useRef(instrument);
+  instrumentRef.current = instrument;
   const notesRef = useRef<ScheduledNote[]>([]);
   const lineRef = useRef(line);
   lineRef.current = line;
@@ -896,6 +905,13 @@ export function ScoreView({
     }
   };
 
+  /** Pitch the panel's chips and photo are in: printed for a uniform score (the audio adds the transpose), concert for a mixed one. */
+  const panelRefMidi = () => {
+    const n = hoverRef.current?.note;
+    if (!n) return 60;
+    return metaRef.current?.transpose.kind === "mixed" ? soundingOf(n) : n.midi;
+  };
+
   const openPanel = () => {
     const cur = hoverRef.current;
     if (!cur) return;
@@ -1517,7 +1533,7 @@ export function ScoreView({
   const onWrapClick = (e: React.MouseEvent<HTMLDivElement>) => {
     // A click (no drag: onClickCapture drops the click after a drag) on a note inside its hover zone plays that note.
     if (!markModeRef.current && hoverRef.current && !patternHitAt(e)) {
-      void playNoteMidi(soundingOf(hoverRef.current.note));
+      void playNoteMidi(soundingOf(hoverRef.current.note), 0.9, 0); // already what sounds: no panel shift
     }
     if (!markModeRef.current && patternLayerRef.current) {
       // Click on a pattern box: go to the next occurrence of that pattern.
@@ -1955,6 +1971,7 @@ export function ScoreView({
         // Hoja sizes its pages from the container's width: wait until the layout has given it one.
         for (let i = 0; i < 20 && view === "hoja" && container.offsetWidth < 50; i++) await new Promise((r) => requestAnimationFrame(r));
         if (cancelled) return;
+        applyInstrumentToSheet(osmd.Sheet, instrumentRef.current);
         applyStemColors(osmd);
         renderScore(osmd, true);
         readyRef.current = true;
@@ -2251,6 +2268,21 @@ export function ScoreView({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Another instrument: its transpose changes what sounds (and, with "Color por: suena", the colors), so read the notes again.
+  useEffect(() => {
+    const osmd = osmdRef.current;
+    if (!osmd || !readyRef.current) return;
+    try {
+      applyInstrumentToSheet(osmd.Sheet, instrument);
+      applyStemColors(osmd);
+      renderScore(osmd, false);
+      wireAfterRender(onNotesRef.current);
+    } catch (e) {
+      console.error("Instrument re-render failed:", e);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [instrument.id]);
 
   // BPM — recompute timings only.
   useEffect(() => {
@@ -2613,7 +2645,9 @@ export function ScoreView({
                   scale={panelScale}
                   closeup={panelCloseup}
                   flipped={panelPos.flipped}
-                  refMidi={hoverRef.current?.note.midi ?? 60}
+                  refMidi={panelRefMidi()}
+                  writtenMidi={hoverRef.current?.note.midi ?? null}
+                  instrument={instrument}
                   more={tipMore}
                   onMore={(v) => {
                     setTipMore(v);
@@ -2684,6 +2718,30 @@ function Closeup({ svg, flipped, onClick }: { svg: SVGSVGElement; flipped?: bool
   );
 }
 
+/** Trumpet only: the pistons for the note, small, with the partial, the other fingerings and the slide hint. */
+function PanelPistons({ written, instrument }: { written: number; instrument: Instrument }) {
+  const { f, usable, warn } = describeNote(written, instrument);
+  const lit = usable ? f : null;
+  const color = pitchClassColor(colorMidiOf({ midi: written, soundingMidi: written + instrument.transposeSemitones }));
+  return (
+    <div className="mt-1 flex items-center gap-2" data-testid="tip-pistons">
+      <PistonsDrawing valves={lit?.valves ?? null} color={color === PLAIN_COLOR ? RING_NEUTRAL_COLOR : color} band={lit ? registerBand(written) : null} numbers={false} className="h-9 w-auto shrink-0" />
+      <div className="text-[11px]">
+        {lit ? (
+          <>
+            <div className="font-medium">
+              {lit.label === "0" ? "Al aire" : `Pistones ${lit.label}`} · parcial {lit.partial}
+              {lit.alternatives.length > 0 && <span className="font-normal text-muted-foreground"> · también: {alternativesText(lit.alternatives)}</span>}
+            </div>
+            {lit.slide && <div className="text-muted-foreground">{slideText(lit.slide)}</div>}
+          </>
+        ) : null}
+        {warn && <div className="italic text-muted-foreground">{warn}</div>}
+      </div>
+    </div>
+  );
+}
+
 /** A collapsible block of the "Más" part: small-caps title, same look as PanelSection. */
 function MoreSection({ title, open, testId, children }: { title: string; open: boolean; testId: string; children: React.ReactNode }) {
   return (
@@ -2705,6 +2763,8 @@ function NotePanel({
   closeup,
   flipped,
   refMidi,
+  writtenMidi,
+  instrument,
   more,
   onMore,
 }: {
@@ -2715,6 +2775,9 @@ function NotePanel({
   flipped?: boolean;
   /** MIDI of the hovered note: chips that only know a name play the nearest note of that name. */
   refMidi: number;
+  /** Written MIDI of the hovered note (what a trumpet's fingering is read from). */
+  writtenMidi: number | null;
+  instrument: Instrument;
   more: boolean;
   onMore: (open: boolean) => void;
 }) {
@@ -2737,6 +2800,7 @@ function NotePanel({
           escrita {ctx.transposed.written} · suena {ctx.transposed.sounding}
         </div>
       )}
+      {instrument.hasPistons && writtenMidi !== null && <PanelPistons written={writtenMidi} instrument={instrument} />}
       <div className="mt-0.5 text-[11px]">
         {tooltip.own.duration} · compás {tooltip.measure}
         {tooltip.beat ? ` · tiempo ${tooltip.beat}` : ""}
