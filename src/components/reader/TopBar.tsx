@@ -13,7 +13,8 @@ import { MidiControl } from "./MidiControl";
 import { useLayersOpen } from "@/lib/music/analysis/useFicha";
 import type { ChordNamesLayer, DegradeLayer, PatternLayer } from "@/lib/music/analysis/usePatternLayer";
 import { ChordNamesControls, DegradeControls, PatternsControls } from "./LayerControls";
-import { ChevronDown, Crosshair, Library, Monitor, Moon, Sun, ChevronUp, Layers, ListMusic, Minus, Pause, Play, Plus, Route, Square } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { ChevronDown, Crosshair, Dices, Library, Monitor, Moon, Sun, ChevronUp, Layers, ListMusic, Minus, Pause, Play, Plus, Route, Square } from "lucide-react";
 
 interface Props {
   isPlaying: boolean;
@@ -234,6 +235,11 @@ export function TopBar({
           onClick={onRecorridoToggle}
         >
           <Route className="h-4 w-4" /> Recorrido
+        </Button>
+        <Button asChild size="sm" variant="outline" className="gap-1">
+          <Link to="/juegos">
+            <Dices className="h-4 w-4" /> Juegos
+          </Link>
         </Button>
         <Button
           size="sm"

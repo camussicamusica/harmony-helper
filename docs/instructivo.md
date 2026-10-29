@@ -1,6 +1,6 @@
 ---
 type: sop
-updated: 2026-10-25
+updated: 2026-10-29
 tags: [harmony-helper]
 ---
 
@@ -766,3 +766,34 @@ Los pasos 4 (oído interno), 8 (improvisar), 9 (sacar un motivo), 10 (componer) 
 
 1. Cuando una caja de patrón empieza en el primer compás de un renglón, ahora arranca después de la clave, la armadura y el compás. Ya no tapa los ♯ ni los ♭.
 2. Podés pasar el mouse por la armadura para ver su cartelito ("Re mayor · 2 ♯") aunque haya cajas encendidas.
+
+## 16. Juegos: Mazo de notas
+
+**Qué es:** cartas con una nota escrita en el pentagrama. Adivinás cuál es, das vuelta la carta y te muestra su nombre y su color. No hay puntos, ni rachas, ni rojo de error: es para practicar tranquila.
+
+**Entrar y salir:**
+1. En el menú de arriba, tocá "Juegos" (al lado de "Recorrido"). Si no ves el menú, tocá "Mostrar menú".
+2. Se abre la página de juegos. "Mazo de notas" ya está elegido.
+3. Para volver a la partitura, tocá "← Partitura" (arriba a la izquierda).
+
+**Jugar con el mouse:**
+1. Mirá una carta boca abajo. Dentro tiene una nota negra en el pentagrama.
+2. Pensá cómo se llama.
+3. Tocá la carta. Se da vuelta, suena la nota y aparece su nombre, por ejemplo "Re (D)". La cabeza de la nota toma el color que elegiste para esa nota.
+4. Tocá "Sacar de nuevo" para repartir cartas nuevas.
+5. Tocá "Dar vuelta todas" si querés ver todas juntas.
+
+**Jugar con el teclado:**
+1. Conectá el teclado con el botón "Conectar teclado MIDI" de arriba a la derecha (ver sección 9.1). Se hace una sola vez.
+2. Tocá en el teclado la nota de la primera carta boca abajo (la de más a la izquierda). En cualquier octava sirve.
+3. Si es esa nota, la carta se da vuelta. Si estás en otra octava, también se da vuelta y abajo dice, en gris, "en otra octava".
+4. Si no es esa nota, la carta no cambia. Abajo, en gris, dice qué tocaste, por ejemplo "Tocaste Mi (E)". Probá de nuevo.
+5. Un bemol y un sostenido de la misma tecla cuentan igual (Re♭ es lo mismo que Do♯).
+
+**Cambiar el juego:**
+1. "Cartas": elegí de 1 a 5.
+2. "Clave": elegí "Sol", "Fa" o "Las dos" (cada carta usa una clave al azar).
+3. "Nivel": elegí de 1 a 6. Al lado dice qué notas se suman. Cada nivel incluye los anteriores. Los sostenidos y bemoles aparecen recién en el nivel 6.
+4. Al cambiar cualquier opción se reparten cartas nuevas.
+
+**Qué todavía no está:** "Mazo de figuras", "Dictado rítmico" y "Cantar" aparecen en gris con la palabra "próximamente".
