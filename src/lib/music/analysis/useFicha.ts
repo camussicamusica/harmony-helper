@@ -4,6 +4,7 @@ import { ALL_KEY_IDS, detectKeyFromNotes, keyFromId, type KeyInfo, type KeyResul
 import { scaleChords, type ScaleChord } from "./chords";
 import { pieceChords, type PieceChord } from "./pieceChords";
 import { EMPTY_META, type ScoreMeta } from "./scoreMeta";
+import { analysisFifths, analysisNotes } from "../transpose";
 
 export interface ScoreData {
   notes: ScheduledNote[];
@@ -69,10 +70,13 @@ export function useFicha(xml: string, data: ScoreData | null, bpm: number, enabl
   const notes = data?.notes;
   const meta = data?.meta ?? EMPTY_META;
 
+  // A uniform transposing part (trumpet alone) is analysed as written; mixed parts are analysed as they sound.
+  const heard = useMemo(() => (notes ? analysisNotes(notes, meta.transpose) : notes), [notes, meta.transpose]);
+
   const detection = useMemo(() => {
-    if (!enabled || !notes?.length) return null;
-    return detectKeyFromNotes(notes, meta.fifths);
-  }, [enabled, notes, meta.fifths]);
+    if (!enabled || !heard?.length) return null;
+    return detectKeyFromNotes(heard, analysisFifths(meta.fifths, meta.transpose));
+  }, [enabled, heard, meta.fifths, meta.transpose]);
 
   const key = useMemo(() => {
     if (overrideId) return keyFromId(overrideId);
@@ -82,8 +86,8 @@ export function useFicha(xml: string, data: ScoreData | null, bpm: number, enabl
   const triads = useMemo(() => (key ? scaleChords(key, false) : []), [key]);
   const sevenths = useMemo(() => (key ? scaleChords(key, true) : []), [key]);
   const chords = useMemo(
-    () => (enabled && key && notes?.length ? pieceChords(notes, key, meta, bpm) : []),
-    [enabled, key, notes, meta, bpm],
+    () => (enabled && key && heard?.length ? pieceChords(heard, key, meta, bpm) : []),
+    [enabled, key, heard, meta, bpm],
   );
 
   const keyIds = useMemo(() => {

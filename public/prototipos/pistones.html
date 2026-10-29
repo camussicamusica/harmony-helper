@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pistones de la trompeta (prototipo)</title>
+<style>
+:root{
+  --bg:#17181b; --panel:#1f2024; --line:#2d2f35; --ink:#d8d9dc; --mute:#8b8e96; --faint:#5e6168;
+  --metal:#8f939b; --metal-dark:#4a4d54; --casing:#2a2c31;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+body{min-height:100vh;overflow-x:hidden}
+main{max-width:1000px;margin:0 auto;padding:20px 16px 40px}
+h1{font-size:20px;font-weight:600;margin:0 0 4px}
+.sub{color:var(--mute);margin:0 0 18px;font-size:14px}
+.row{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;margin-bottom:14px}
+label.k{color:var(--mute);font-size:13px}
+select,button{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 12px;cursor:pointer}
+button:hover,select:hover{border-color:#44474f}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid #6b7a99;outline-offset:2px}
+button.on{background:#2c3038;border-color:#5b6275}
+.seg{display:inline-flex}
+.seg button{border-radius:0;margin-left:-1px}
+.seg button:first-child{border-radius:8px 0 0 8px;margin-left:0}
+.seg button:last-child{border-radius:0 8px 8px 0}
+input[type=range]{accent-color:#8b93a8;width:150px}
+.stage{display:grid;grid-template-columns:minmax(260px,420px) 1fr;gap:24px;align-items:start;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px}
+@media (max-width:700px){.stage{grid-template-columns:1fr;padding:14px}}
+svg{display:block;width:100%;height:auto;max-width:420px;margin:0 auto}
+.piston-cap,.piston-stem,.piston-spring{transition:transform .09s ease-out}
+.pressed .piston-move{transform:translateY(34px)}
+.piston-move{transition:transform .09s ease-out}
+.piston-fill{transition:fill .12s}
+#dot{transition:fill .12s}
+.readout .big{font-size:30px;font-weight:600;line-height:1.15;margin:0}
+.readout .sound{color:var(--mute);margin:4px 0 12px}
+.readout .meta{display:flex;gap:18px;flex-wrap:wrap;font-size:14px;color:var(--ink)}
+.readout .meta span b{color:var(--mute);font-weight:400;margin-right:6px}
+.alts{color:var(--faint);font-size:13px;margin-top:10px;min-height:1.4em}
+.prog{margin-top:18px;display:flex;gap:3px;flex-wrap:wrap}
+.prog i{display:block;height:6px;border-radius:3px;background:#34363d;min-width:6px}
+.prog i.cur{background:#9aa0ae}
+.note{color:var(--faint);font-size:12.5px;margin-top:16px}
+.bandlabel{fill:var(--faint);font-size:10px}
+.warn{color:#b99a6a;font-size:13px}
+</style>
+</head>
+<body>
+<main>
+  <h1>Pistones de la trompeta</h1>
+  <p class="sub">Prototipo. Trompeta en Si♭: lo escrito suena un tono más grave. Los dedos siguen la nota <b>escrita</b>.</p>
+
+  <div class="row">
+    <label class="k" for="piece">Pieza</label>
+    <select id="piece"></select>
+    <span class="seg" role="group" aria-label="Color">
+      <button id="cA" class="on" type="button">Color A</button>
+      <button id="cB" type="button">Color B</button>
+    </span>
+    <span id="colorHelp" class="k"></span>
+  </div>
+
+  <div class="row">
+    <button id="play" type="button">▶ Reproducir</button>
+    <span class="seg" role="group" aria-label="Paso a paso">
+      <button id="prev" type="button" aria-label="Nota anterior">◀</button>
+      <button id="next" type="button" aria-label="Nota siguiente">▶</button>
+    </span>
+    <label class="k" for="tempo">Tempo</label>
+    <input id="tempo" type="range" min="30" max="180" step="2" value="80">
+    <span id="tempoV" class="k">80</span>
+    <label class="k"><input id="snd" type="checkbox"> Sonido suave</label>
+  </div>
+
+  <div class="stage">
+    <svg id="svg" viewBox="0 0 420 330" role="img" aria-label="Tres pistones de trompeta">
+      <text x="8" y="22" fill="#5e6168" font-size="11">← boquilla</text>
+      <text x="412" y="22" fill="#5e6168" font-size="11" text-anchor="end">campana →</text>
+      <g id="pistons"></g>
+      <!-- register bar -->
+      <g id="regbar"></g>
+      <circle id="dot" cx="150" cy="306" r="7" fill="#3a3c43"/>
+      <text id="dotLabel" x="164" y="310" fill="#5e6168" font-size="11"></text>
+    </svg>
+    <div class="readout" aria-live="polite">
+      <p class="big" id="name">—</p>
+      <p class="sound" id="sound"></p>
+      <div class="meta">
+        <span><b>Dedos</b><span id="fing">—</span></span>
+        <span><b>Parcial</b><span id="partial">—</span></span>
+        <span><b>Registro</b><span id="band">—</span></span>
+      </div>
+      <div class="alts" id="alts"></div>
+      <div class="prog" id="prog"></div>
+      <p class="note">Escala y Serie al aire usan solo notas escritas. La nota 7 de la serie (Si♭5 al aire) se evita porque suena baja; se toca con el 1.</p>
+    </div>
+  </div>
+</main>
+
+<script>
+/* ---------- fingering logic (copia de src/lib/trumpet/fingerings.ts) ---------- */
+const VALVE_SEMI=[2,1,3];
+const OPEN={1:48,2:60,3:67,4:72,5:76,6:79,7:82,8:84,9:86,10:88,12:91,16:96};
+const USABLE=[1,2,3,4,5,6,8,9,10,12,16];
+const SLIDE={54:"corredera 3ª afuera",55:"corredera 3ª afuera",61:"corredera 3ª afuera",62:"corredera 3ª afuera"};
+const EXTRA={67:[[5,4]],71:[[5,5]],72:[[4,5]],86:[[2,10]],88:[[3,12]],91:[[5,16]]};
+function vFromSemi(s){return ({0:[0,0,0],1:[0,1,0],2:[1,0,0],3:[1,1,0],4:[0,1,1],5:[1,0,1],6:[1,1,1]})[s]||null}
+function vLabel(v){const o=v.map((x,i)=>x?i+1:"").filter(Boolean);return o.length?o.join("-"):"0"}
+function fingeringFor(n){
+  if(n<36||n>96)return null;
+  if(n<54){const v=vFromSemi(48-n);return v?{valves:v,partial:1,label:vLabel(v),alts:[],ok:true}:{valves:[1,1,1],partial:n>48?2:1,label:"1-2-3",alts:[],ok:false}}
+  let pick=n===85?{semis:3,partial:10}:null;
+  if(!pick){for(const p of USABLE){const s=OPEN[p]-n;if(s>=0&&s<=6){pick={semis:s,partial:p};break}}}
+  if(!pick)return null;
+  const v=vFromSemi(pick.semis),alts=[];
+  if(pick.semis===3)alts.push({label:"3",partial:pick.partial});
+  (EXTRA[n]||[]).forEach(([s,p])=>alts.push({label:vLabel(vFromSemi(s)),partial:p}));
+  return {valves:v,partial:pick.partial,label:vLabel(v),alts,slide:SLIDE[n],ok:true};
+}
+function registerBand(n){return n<54?0:n<60?1:n<72?2:n<84?3:4}
+
+/* ---------- names ---------- */
+const ES=["Do","Do♯","Re","Re♯","Mi","Fa","Fa♯","Sol","Sol♯","La","Si♭","Si"];
+const EN=["C","C♯","D","D♯","E","F","F♯","G","G♯","A","B♭","B"];
+const noteName=m=>ES[((m%12)+12)%12]+(Math.floor(m/12)-1)+" ("+EN[((m%12)+12)%12]+(Math.floor(m/12)-1)+")";
+
+/* ---------- pieces (written pitch; dur in quarter notes; null = silencio) ---------- */
+const R=(m,d)=>({m,d});
+const PIECES={
+  rimsky:{name:"Rimsky-Korsakov, trompeta 1 (pasaje)",bpm:80,notes:[
+    [79,1.5],[76,.5],[77,.5],[76,.5],[74,.5],[72,.5],[74,.5],[76,.5],[77,.5],[81,.5],[79,1],[76,.5],[null,.5],
+    [79,1.5],[76,.5],[77,.5],[76,.5],[74,.5],[72,.5],[71,.5],[69,.5],[67,.5],[71,.5],[72,1],[72,.5],[null,.5],[null,1]
+  ].map(([m,d])=>R(m,d))},
+  escala:{name:"Escala de Do mayor (escrita C4–C5)",bpm:80,notes:[60,62,64,65,67,69,71,72].map(m=>R(m,1))},
+  serie:{name:"Serie al aire (C4 G4 C5 E5 G5 C6)",bpm:60,notes:[60,67,72,76,79,84].map(m=>R(m,1))}
+};
+
+/* ---------- colors ---------- */
+const NEUTRAL=["#c96a6a","#b8806a","#c9a84f","#a8a85a","#6aa889","#5e9db0","#5a7fb8","#6a6fc0","#8a6fc0","#b06fb0","#b86f8f","#c98080"];
+let noteColors=NEUTRAL.slice(),colorSrc="neutra";
+try{ // read-only: never writes
+  const raw=localStorage.getItem("hh.colors.v1");
+  if(raw){const st=JSON.parse(raw);const p=(st.versions||[]).find(v=>v.id===st.currentId)||(st.versions||[])[0];
+    if(p){const c=NEUTRAL.slice();let n=0;for(let pc=0;pc<12;pc++){const r=(p.roles||[]).find(r=>r.id==="note-"+pc);if(r&&/^#[0-9a-f]{6}$/i.test(r.color)){c[pc]=r.color;n++}}
+      if(n===12){noteColors=c;colorSrc="Sofía"}}}
+}catch(e){}
+const hex=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
+const toHex=a=>"#"+a.map(v=>Math.round(v).toString(16).padStart(2,"0")).join("");
+/* Color B: infrarrojo → ultravioleta by pitch, soft tones */
+const ANCH=[[0,"#8a3038"],[59,"#8a3038"],[60,"#c0653c"],[66,"#c4a741"],[71,"#52a58b"],[72,"#4c93b4"],[78,"#4a70bf"],[83,"#5a62c2"],[84,"#8a64bf"],[96,"#8a64bf"]];
+function spectrum(m){
+  for(let i=1;i<ANCH.length;i++){const [m1,c1]=ANCH[i];if(m<=m1){const [m0,c0]=ANCH[i-1];const t=m1===m0?1:(m-m0)/(m1-m0);const a=hex(c0),b=hex(c1);return toHex(a.map((x,k)=>x+(b[k]-x)*t))}}
+  return ANCH[ANCH.length-1][1];
+}
+let variant="A";
+function colorOf(m){return variant==="A"?noteColors[((m%12)+12)%12]:spectrum(m)}
+
+/* ---------- drawing ---------- */
+const NS="http://www.w3.org/2000/svg";
+const el=(t,a,p)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e};
+const PX=[70,150,230]; // piston centers; 1 is closest to the mouthpiece (left)
+const pistonG=[],caps=[];
+(function build(){
+  const g=document.getElementById("pistons");
+  // lead pipe hint
+  el("rect",{x:20,y:236,width:300,height:10,rx:5,fill:"#2a2c31"},g);
+  PX.forEach((x,i)=>{
+    const grp=el("g",{class:"piston"},g);
+    el("rect",{x:x-24,y:130,width:48,height:130,rx:10,fill:"#2a2c31",stroke:"#3a3d44"},grp); // casing
+    el("rect",{x:x-24,y:124,width:48,height:10,rx:3,fill:"#3a3d44"},grp); // cap ring
+    const mv=el("g",{class:"piston-move"},grp);
+    el("rect",{x:x-5,y:60,width:10,height:84,rx:3,fill:"#6a6e76"},mv); // stem
+    const cap=el("rect",{x:x-20,y:44,width:40,height:20,rx:8,fill:"#8f939b",class:"piston-fill"},mv); // finger button
+    el("rect",{x:x-20,y:44,width:40,height:6,rx:3,fill:"#a2a6ae",opacity:.35},mv);
+    el("text",{x:x,y:290,"text-anchor":"middle",fill:"#8b8e96","font-size":15,"font-weight":600},grp).textContent=String(i+1);
+    pistonG.push(grp);caps.push(cap);
+  });
+  // register bar: 5 segments, band 4 on top
+  const rb=document.getElementById("regbar");
+  for(let b=0;b<5;b++){el("rect",{x:350,y:60+(4-b)*36,width:12,height:30,rx:3,fill:"#34363d",id:"rb"+b},rb)}
+  el("text",{x:356,y:50,"text-anchor":"middle",class:"bandlabel"},rb).textContent="agudo";
+  el("text",{x:356,y:258,"text-anchor":"middle",class:"bandlabel"},rb).textContent="grave";
+})();
+const GREYS=["#3b3d44","#50535b","#6a6e77","#8b8f99","#b3b7c0"]; // dark → bright
+
+function show(item){
+  const caps_=caps,m=item&&item.m;
+  const f=m!=null?fingeringFor(m):null;
+  const col=m!=null?colorOf(m):null;
+  pistonG.forEach((g,i)=>{
+    const on=!!(f&&f.valves[i]);
+    g.classList.toggle("pressed",on);
+    caps_[i].setAttribute("fill",on?col:"#8f939b");
+  });
+  const dot=document.getElementById("dot");
+  dot.setAttribute("fill",col||"#3a3c43");
+  document.getElementById("dotLabel").textContent=f&&!f.valves.some(Boolean)?"al aire":"";
+  const band=m!=null?registerBand(m):-1;
+  for(let b=0;b<5;b++)document.getElementById("rb"+b).setAttribute("fill",b===band?GREYS[b]:"#2c2e34");
+  const $=id=>document.getElementById(id);
+  if(m==null){
+    $("name").textContent=item?"Silencio":"—";$("sound").textContent="";$("fing").textContent="—";$("partial").textContent="—";$("band").textContent="—";$("alts").textContent="";return;
+  }
+  $("name").textContent=noteName(m);
+  $("sound").textContent="escrita "+noteName(m)+" · suena "+noteName(m-2);
+  $("fing").textContent=f?(f.label==="0"?"al aire":f.label)+(f.slide?" · "+f.slide:""):"fuera de rango";
+  $("partial").textContent=f?f.partial+(f.ok?"":" (sin nota real)"):"—";
+  $("band").textContent=["pedal","grave","media","aguda","muy aguda"][band]+" ("+band+")";
+  $("alts").textContent=f&&f.alts.length?"También: "+f.alts.map(a=>(a.label==="0"?"al aire":a.label)+" (parcial "+a.partial+")").join(" · "):"";
+}
+
+/* ---------- player ---------- */
+let piece=PIECES.rimsky,idx=-1,timer=null,playing=false,bpm=80;
+const $=id=>document.getElementById(id);
+function renderProg(){
+  const p=$("prog");p.innerHTML="";
+  piece.notes.forEach((n,i)=>{const b=document.createElement("i");b.style.flex=String(n.d);b.style.width=(n.d*14)+"px";if(i===idx)b.className="cur";p.appendChild(b)});
+}
+function goto(i){idx=i;show(i>=0?piece.notes[i]:null);renderProg();if(i>=0)beep(piece.notes[i])}
+function tick(){
+  const n=idx+1;
+  if(n>=piece.notes.length){stop();return}
+  goto(n);
+  timer=setTimeout(tick,piece.notes[n].d*60000/bpm);
+}
+function start(){
+  if(idx>=piece.notes.length-1)idx=-1;
+  playing=true;$("play").textContent="⏸ Pausa";tick();
+}
+function stop(){playing=false;clearTimeout(timer);timer=null;$("play").textContent="▶ Reproducir";silence()}
+$("play").onclick=()=>playing?stop():start();
+$("next").onclick=()=>{if(playing)stop();goto(Math.min(piece.notes.length-1,idx+1))};
+$("prev").onclick=()=>{if(playing)stop();goto(Math.max(0,idx-1))};
+$("tempo").oninput=e=>{bpm=+e.target.value;$("tempoV").textContent=bpm};
+$("piece").innerHTML=Object.entries(PIECES).map(([k,p])=>`<option value="${k}">${p.name}</option>`).join("");
+$("piece").onchange=e=>{stop();piece=PIECES[e.target.value];bpm=piece.bpm;$("tempo").value=bpm;$("tempoV").textContent=bpm;goto(-1)};
+function setVariant(v){
+  variant=v;$("cA").classList.toggle("on",v==="A");$("cB").classList.toggle("on",v==="B");
+  $("colorHelp").textContent=v==="A"?"Color de cada nota ("+(colorSrc==="Sofía"?"tus colores guardados":"paleta neutra, no encontré tus colores")+"). La barra gris es el registro.":"Color por registro: de rojo (grave) a violeta (agudo).";
+  show(idx>=0?piece.notes[idx]:null);
+}
+$("cA").onclick=()=>setVariant("A");$("cB").onclick=()=>setVariant("B");
+document.addEventListener("keydown",e=>{
+  if(e.target.matches("select,input"))return;
+  if(e.key==="ArrowRight")$("next").click();else if(e.key==="ArrowLeft")$("prev").click();
+});
+
+/* ---------- optional sound: sine at the SOUNDING pitch, off by default ---------- */
+let ac=null,osc=null,gain=null;
+function beep(n){
+  if(!$("snd").checked||n.m==null){silence();return}
+  ac=ac||new (window.AudioContext||window.webkitAudioContext)();
+  const f=440*Math.pow(2,(n.m-2-69)/12);
+  if(!osc){osc=ac.createOscillator();gain=ac.createGain();osc.type="sine";gain.gain.value=0.0001;osc.connect(gain).connect(ac.destination);osc.start()}
+  osc.frequency.setTargetAtTime(f,ac.currentTime,0.01);
+  gain.gain.setTargetAtTime(0.08,ac.currentTime,0.02);
+}
+function silence(){if(gain&&ac)gain.gain.setTargetAtTime(0.0001,ac.currentTime,0.03)}
+$("snd").onchange=()=>{if(!$("snd").checked)silence()};
+
+bpm=piece.bpm;setVariant("A");goto(-1);
+</script>
+</body>
+</html>

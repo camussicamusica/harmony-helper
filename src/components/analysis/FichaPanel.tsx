@@ -15,6 +15,7 @@ import { noteColor, useColors } from "@/lib/colors/store";
 import { solfegeName } from "@/lib/music/naming";
 import { spelledPc } from "@/lib/colors/noteChip";
 import { keyFromId } from "@/lib/music/analysis/key";
+import { soundingKeyLabel } from "@/lib/music/transpose";
 import {
   FUNCTION_ROLE,
   FUNCTION_ES,
@@ -116,6 +117,16 @@ export function FichaPanel({
 
   const timeSig = ficha.meta.timeSig ? `${ficha.meta.timeSig.beats}/${ficha.meta.timeSig.beatType}` : null;
 
+  // Trumpet alone: detected on the written notes, so also say where it sounds. Orchestra: detected on what sounds.
+  const tr = ficha.meta.transpose;
+  const transposeNote = !key
+    ? null
+    : tr.kind === "uniform"
+      ? `escrita en ${key.label} · suena en ${soundingKeyLabel(key.tonic, key.mode, tr.semitones)}`
+      : tr.kind === "mixed"
+        ? "según lo que suena (hay instrumentos que transponen)"
+        : null;
+
   const confidenceText = () => {
     if (!detection) return "";
     if (ficha.overridden) return "elegida por vos";
@@ -215,6 +226,9 @@ export function FichaPanel({
             {/* a. Tonalidad */}
             <Section title="Tonalidad" focus={focus}>
               <div className="text-2xl font-semibold leading-tight">{key.label}</div>
+              {transposeNote && (
+                <div className="mt-0.5 text-sm" data-testid="ficha-sounding">{transposeNote}</div>
+              )}
               <div className="mt-0.5 text-sm text-muted-foreground">{confidenceText()}</div>
               {detection && !ficha.overridden && detection.mode.differs && (
                 <div className="mt-1 text-xs text-muted-foreground">Modo que mejor encaja: {detection.mode.label}</div>

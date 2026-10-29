@@ -7,7 +7,7 @@ import { readLayoutInfo, withTitle } from "@/lib/music/layoutInfo";
 import { accidentalOwners, keySigAccidentals, modifierOwners, nearestMidiForPc } from "@/lib/music/accidentals";
 import { anchorScroll, canStartEstudiarDrag, centerScroll, tocarPadY } from "@/lib/music/panMath";
 import { hoverText, INTERVAL_KEY_LABEL, solfegeName } from "@/lib/music/naming";
-import { noteContext, type NoteContext } from "@/lib/music/analysis/noteContext";
+import { noteContext, pitchOf, type NoteContext } from "@/lib/music/analysis/noteContext";
 import { buildScaleView, type ScaleView } from "@/lib/music/analysis/scaleView";
 import { ScaleInKey } from "./ScaleInKey";
 import { KeyPanel } from "./KeyPanel";
@@ -17,6 +17,8 @@ import { playChordMidi, playNoteMidi } from "@/lib/music/analysis/audio";
 import { detectKeyFromNotes, type KeyInfo } from "@/lib/music/analysis/key";
 import { buildGeometry } from "@/lib/music/melodicLine";
 import { pitchClassColor } from "@/lib/music/midiUtils";
+import { colorMidiOf, getColorBy, subscribeColorBy } from "@/lib/colors/colorBy";
+import { analysisFifths, analysisNotes, soundingOf, toConcert, writtenAndSounding } from "@/lib/music/transpose";
 import {
   DISABLED_SEGMENT_COLOR,
   HALO_COLOR,
@@ -323,11 +325,16 @@ export function ScoreView({
     }
   };
 
+  /** Pitch class that colors a hovered note: its spelling, or the sounding pitch under "Color por: suena". */
+  const hoverPc = (note: ScheduledNote) =>
+    getColorBy() === "sounding" ? colorMidiOf(note) % 12 : spelledPc(note.spelledName) >= 0 ? spelledPc(note.spelledName) : note.midi % 12;
+
   /** Repaint accidentals and the hover/playing color from the palette. No OSMD re-render needed. */
   const paintNotes = (notes: ScheduledNote[]) => {
     for (const note of notes) {
-      const color = pitchClassColor(note.midi);
-      const accColor = noteTargetOn(note.midi, "accidental") ? color : PLAIN_COLOR;
+      const cm = colorMidiOf(note);
+      const color = pitchClassColor(cm);
+      const accColor = noteTargetOn(cm, "accidental") ? color : PLAIN_COLOR;
       for (const aEl of note.accidentalEls ?? []) {
         try {
           aEl.setAttribute("fill", accColor);
@@ -605,7 +612,7 @@ export function ScoreView({
     const sub = part.length ? part : all;
     let det: ReturnType<typeof detectKeyFromNotes> | null = null;
     try {
-      if (sub.length) det = detectKeyFromNotes(sub, fifths);
+      if (sub.length) det = detectKeyFromNotes(analysisNotes(sub, meta?.transpose), analysisFifths(fifths, meta?.transpose));
     } catch {
       det = null;
     }
@@ -613,7 +620,7 @@ export function ScoreView({
     const fk = hoverKeyRef.current;
     const key = fk && fk.fifths === fifths ? fk : (det?.best.key ?? null);
     const word = key && det && key.id === det.best.key.id ? det.confidenceWord : undefined;
-    return buildKeySigView(fifths, z.staff === 0 ? "treble" : "bass", key, key ? keyEvidence(sub, key) : [], word);
+    return buildKeySigView(fifths, z.staff === 0 ? "treble" : "bass", key, key ? keyEvidence(analysisNotes(sub, meta?.transpose), key) : [], word, meta?.transpose.kind === "uniform" ? meta.transpose.semitones : 0);
   };
 
   /** Tag beside the zone (re-read live so scrolling keeps it attached). */
@@ -676,7 +683,7 @@ export function ScoreView({
     const cur = hoverRef.current;
     if (!cur) return;
     hoverRef.current = null;
-    activeNotes.removeHover(cur.note.midi, cur.note.hand);
+    activeNotes.removeHover(soundingOf(cur.note), cur.note.hand);
     cur.els.forEach((el) => el.classList.remove("note-hover"));
     cur.halo.forEach((el) => el.classList.remove("note-halo"));
     cur.head?.classList.remove("head-hover-fill", "head-hover-glow");
@@ -690,13 +697,13 @@ export function ScoreView({
     const head = note.headEl?.isConnected ? note.headEl : undefined;
     const shared = (g: SVGGElement) => notesRef.current.filter((n) => n.svgEls?.[0] === g).length > 1;
     const els: Element[] = (note.svgEls ?? []).map((g) => (shared(g) && head ? head : g));
-    activeNotes.addHover(note.midi, note.hand);
+    activeNotes.addHover(soundingOf(note), note.hand);
     els.forEach((el) => el.classList.add("note-hover"));
     // White border around the whole note or chord (head, stem, flag) so its color stands out on any background.
     const halo: Element[] = note.svgEls ?? [];
     halo.forEach((el) => el.classList.add("note-halo"));
     if (head) {
-      const hh = headHoverStyle(spelledPc(note.spelledName) >= 0 ? spelledPc(note.spelledName) : note.midi % 12, getPalette().roles);
+      const hh = headHoverStyle(hoverPc(note), getPalette().roles);
       if (hh) {
         head.style.setProperty("--head-color", hh.color);
         head.classList.add(hh.mode === "fill" ? "head-hover-fill" : "head-hover-glow");
@@ -704,7 +711,7 @@ export function ScoreView({
     }
     // Its accidental lights up with it.
     if (head) {
-      const hh2 = headHoverStyle(spelledPc(note.spelledName) >= 0 ? spelledPc(note.spelledName) : note.midi % 12, getPalette().roles);
+      const hh2 = headHoverStyle(hoverPc(note), getPalette().roles);
       if (hh2) {
         for (const a of note.accidentalEls ?? []) {
           a.style.setProperty("--head-color", hh2.color);
@@ -726,8 +733,10 @@ export function ScoreView({
       let chords: PieceChord[] = [];
       try {
         if (notes.length) {
-          key = detectKeyFromNotes(notes, metaRef.current?.fifths).best.key;
-          if (metaRef.current) chords = pieceChords(notes, key, metaRef.current, bpmRef.current);
+          const tr = metaRef.current?.transpose;
+          const heard = analysisNotes(notes, tr);
+          key = detectKeyFromNotes(heard, analysisFifths(metaRef.current?.fifths, tr)).best.key;
+          if (metaRef.current) chords = pieceChords(heard, key, metaRef.current, bpmRef.current);
         }
       } catch {
         /* no analysis: the panel just leaves those sections out */
@@ -836,8 +845,7 @@ export function ScoreView({
       }
       const target = inClone(head);
       if (target) {
-        const pc = spelledPc(note.spelledName) >= 0 ? spelledPc(note.spelledName) : note.midi % 12;
-        const color = headHoverStyle(pc, getPalette().roles)?.color ?? pitchClassColor(note.midi); // same color as the tag
+        const color = headHoverStyle(hoverPc(note), getPalette().roles)?.color ?? pitchClassColor(colorMidiOf(note)); // same color as the tag
         const paint = (e: Element) => {
           e.setAttribute("fill", color);
           (e as SVGElement).style.fill = color;
@@ -898,9 +906,17 @@ export function ScoreView({
     t.open = true;
     const { key, chords } = analysisForPanel();
     const live = notesRef.current.find((n) => n.id === cur.note.id) ?? cur.note;
-    setPanelCtx(noteContext(live, notesRef.current, key, chords));
+    const tr = metaRef.current?.transpose;
+    if (tr?.kind === "mixed") {
+      // Mixed parts: key and chord context is about what sounds; the NOTA line still says what is printed.
+      const ctx = noteContext(toConcert(live), analysisNotes(notesRef.current, tr), key, chords);
+      setPanelCtx({ ...ctx, pitch: pitchOf(live), transposed: writtenAndSounding(live) });
+      setPanelScale(key ? buildScaleView(toConcert(live), key, analysisNotes(notesRef.current, tr)) : null);
+    } else {
+      setPanelCtx(noteContext(live, notesRef.current, key, chords));
+      setPanelScale(key ? buildScaleView(live, key, notesRef.current) : null);
+    }
     setPanelCloseup(buildCloseup(live));
-    setPanelScale(key ? buildScaleView(live, key, notesRef.current) : null);
     setTipMore(readTipMore());
     setPanelOpen(true);
   };
@@ -1401,7 +1417,7 @@ export function ScoreView({
       const sys = n.system ?? 0;
       const rows = staffRowsRef.current.get(sys) ?? [];
       const staff = rows.length >= 2 && n.hand === "LH" ? 1 : 0;
-      dnotes.push({ x: n.cx, staff, system: sys, startSec: n.startSec, endSec: n.startSec + n.durationSec, color: degradeColor(n.midi) });
+      dnotes.push({ x: n.cx, staff, system: sys, startSec: n.startSec, endSec: n.startSec + n.durationSec, color: degradeColor(colorMidiOf(n)) });
       const k = `${sys}:${staff}`;
       const sp = spans.get(k);
       if (sp) {
@@ -1501,7 +1517,7 @@ export function ScoreView({
   const onWrapClick = (e: React.MouseEvent<HTMLDivElement>) => {
     // A click (no drag: onClickCapture drops the click after a drag) on a note inside its hover zone plays that note.
     if (!markModeRef.current && hoverRef.current && !patternHitAt(e)) {
-      void playNoteMidi(hoverRef.current.note.midi);
+      void playNoteMidi(soundingOf(hoverRef.current.note));
     }
     if (!markModeRef.current && patternLayerRef.current) {
       // Click on a pattern box: go to the next occurrence of that pattern.
@@ -1677,8 +1693,8 @@ export function ScoreView({
           x2,
           y2,
         });
-        grad.appendChild(svgEl("stop", { offset: "0", "stop-color": pitchClassColor(seg.from.midi) }));
-        grad.appendChild(svgEl("stop", { offset: "1", "stop-color": pitchClassColor(seg.to.midi) }));
+        grad.appendChild(svgEl("stop", { offset: "0", "stop-color": pitchClassColor(colorMidiOf(seg.from)) }));
+        grad.appendChild(svgEl("stop", { offset: "1", "stop-color": pitchClassColor(colorMidiOf(seg.to)) }));
         defs.appendChild(grad);
         halos.appendChild(
           svgEl("line", {
@@ -1726,7 +1742,7 @@ export function ScoreView({
             cy: n.cy!,
             r: RING_R,
             fill: "none",
-            stroke: mode === "intervalos" ? RING_NEUTRAL_COLOR : pitchClassColor(n.midi),
+            stroke: mode === "intervalos" ? RING_NEUTRAL_COLOR : pitchClassColor(colorMidiOf(n)),
             "stroke-width": 1.75,
           }),
         );
@@ -2194,14 +2210,16 @@ export function ScoreView({
 
   // Colors — repaint live when the palette changes. Stems need an OSMD re-render (debounced).
   useEffect(() => {
-    let lastSig = noteSignature();
+    // "Color por: escrita / suena" repaints exactly like a palette edit does.
+    const sigNow = () => `${noteSignature()}|${getColorBy()}`;
+    let lastSig = sigNow();
     let lastIntSig = intervalSignature();
     let timer: ReturnType<typeof setTimeout> | null = null;
-    const unsub = subscribeColors(() => {
+    const onColorsChanged = () => {
       drawChords(); // chord role colors may have changed
       drawHard();
       drawDegrade(); // the band follows the note colors
-      const sig = noteSignature();
+      const sig = sigNow();
       const intSig = intervalSignature();
       if (intSig !== lastIntSig) {
         lastIntSig = intSig;
@@ -2223,9 +2241,12 @@ export function ScoreView({
           console.error("Color re-render failed:", e);
         }
       }, 150);
-    });
+    };
+    const unsub = subscribeColors(onColorsChanged);
+    const unsubBy = subscribeColorBy(onColorsChanged);
     return () => {
       unsub();
+      unsubBy();
       if (timer) clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2711,6 +2732,11 @@ function NotePanel({
         <ChordNoteChips spelled={[tooltip.own.spelled]} size="lg" onNoteClick={playName} />
         <span className="text-sm font-medium" data-testid="tip-octave">{ctx.pitch.octaveLabel}</span>
       </div>
+      {ctx.transposed && (
+        <div className="mt-0.5 text-[11px] text-muted-foreground" data-testid="tip-sounding">
+          escrita {ctx.transposed.written} · suena {ctx.transposed.sounding}
+        </div>
+      )}
       <div className="mt-0.5 text-[11px]">
         {tooltip.own.duration} · compás {tooltip.measure}
         {tooltip.beat ? ` · tiempo ${tooltip.beat}` : ""}

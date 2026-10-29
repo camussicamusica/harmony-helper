@@ -3,6 +3,7 @@ import type { ScheduledNote } from "../types";
 import { noteLabel, solfegeName } from "../naming";
 import type { Clef } from "../staffMath";
 import { keyInfo, type KeyInfo } from "./key";
+import { soundingKeyLabel } from "../transpose";
 
 /** Order in which sharps / flats are added to a key signature. */
 export const SHARP_ORDER = ["F", "C", "G", "D", "A", "E", "B"] as const;
@@ -126,6 +127,8 @@ export function buildKeySigView(
   detected: KeyInfo | null,
   evidence: string[] = [],
   confidenceWord?: string,
+  /** Chromatic transpose of the instrument (B♭ trumpet = -2): the tag then also says which key it sounds in. */
+  transpose = 0,
 ): KeySigView {
   const f = clampFifths(fifths);
   const matches = !!detected && detected.fifths === f;
@@ -142,7 +145,7 @@ export function buildKeySigView(
   return {
     fifths: f,
     clef,
-    tag: signatureTag(f),
+    tag: transpose ? `${signatureTag(f)} · suena en ${soundingKeyLabel(majorTonicOf(f), "major", transpose)}` : signatureTag(f),
     accidentals: signatureAccidentals(f),
     steps: signatureSteps(f, clef),
     which: whichKeyText(f),

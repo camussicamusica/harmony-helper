@@ -4,7 +4,10 @@ export type IsolationMode = "both" | "rh" | "lh";
 
 export interface ScheduledNote {
   id: string;
+  /** WRITTEN pitch (what the score prints). */
   midi: number;
+  /** Pitch that sounds: midi + the chromatic transpose of the note's part (B♭ trumpet = -2). Equals midi when none. */
+  soundingMidi?: number;
   noteName: string;
   startSec: number;
   durationSec: number;

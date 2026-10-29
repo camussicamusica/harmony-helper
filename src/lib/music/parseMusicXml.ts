@@ -5,6 +5,7 @@ import { durationNameFor } from "./naming";
 import { markPhrases } from "./melodicLine";
 import { noteColor, noteTargetOn } from "@/lib/colors/store";
 import { PLAIN_COLOR } from "@/lib/colors/defaults";
+import { getColorBy } from "@/lib/colors/colorBy";
 
 const LETTER_BY_SEMITONE: Record<number, string> = { 0: "C", 2: "D", 4: "E", 5: "F", 7: "G", 9: "A", 11: "B" };
 
@@ -16,6 +17,12 @@ function spellPitch(pitch: any, midi: number): string {
     return ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"][midi % 12];
   }
   return letter + (alter > 0 ? "#".repeat(alter) : "b".repeat(-alter));
+}
+
+/** Chromatic transpose (<transpose><chromatic>, B♭ trumpet = -2) of the part a source note belongs to; 0 when none. */
+function partTranspose(src: any): number {
+  const t = src?.ParentStaffEntry?.ParentStaff?.ParentInstrument?.PlaybackTranspose;
+  return typeof t === "number" && Number.isFinite(t) ? t : 0;
 }
 
 export interface ParseResult {
@@ -37,6 +44,7 @@ export function applyStemColors(osmd: OpenSheetMusicDisplay) {
   } catch {
     /* ignore */
   }
+  const bySounding = getColorBy() === "sounding";
   for (const measure of sheet.SourceMeasures ?? []) {
     for (const vssec of measure.VerticalSourceStaffEntryContainers ?? []) {
       for (const se of vssec.StaffEntries ?? []) {
@@ -47,7 +55,8 @@ export function applyStemColors(osmd: OpenSheetMusicDisplay) {
             if (n.isRest?.()) continue;
             const p = n.Pitch;
             if (!p) continue;
-            const midi = (p.halfTone ?? 0) + 12;
+            // Colored by the written pitch, or by the sounding one when she chose "Color por: suena".
+            const midi = (p.halfTone ?? 0) + 12 + (bySounding ? partTranspose(n) : 0);
             if (midi < bottomMidi) bottomMidi = midi;
             // Hollow noteheads stay hollow when colored, so duration stays readable.
             n.NoteheadColor = noteTargetOn(midi, "notehead") ? noteColor(midi) : PLAIN_COLOR;
@@ -110,6 +119,7 @@ export function parseSheetToNotes(osmd: OpenSheetMusicDisplay, bpm = 90): ParseR
             const pitch = src.Pitch;
             if (!pitch) continue;
             const midi = (pitch.halfTone ?? 0) + 12;
+            const soundingMidi = midi + partTranspose(src);
             const length = src.Length?.RealValue ?? 0;
             if (length <= 0) continue;
 
@@ -161,6 +171,7 @@ export function parseSheetToNotes(osmd: OpenSheetMusicDisplay, bpm = 90): ParseR
             notes.push({
               id,
               midi,
+              soundingMidi,
               noteName: midiToName(midi),
               startSec,
               durationSec,

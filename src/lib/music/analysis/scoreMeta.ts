@@ -1,3 +1,5 @@
+import { NO_TRANSPOSE, summarizeTranspose, type TransposeInfo } from "../transpose";
+
 /** Things the analysis needs from OSMD's source model (not from the rendered SVG). */
 export interface MeasureSpan {
   number: number;
@@ -13,9 +15,11 @@ export interface ScoreMeta {
   /** Time signature of the first measure. */
   timeSig: { beats: number; beatType: number } | null;
   measures: MeasureSpan[];
+  /** Chromatic transpose of each part (B♭ trumpet = -2) and whether the score is uniform, none or mixed. */
+  transpose: TransposeInfo;
 }
 
-export const EMPTY_META: ScoreMeta = { fifths: null, timeSig: null, measures: [] };
+export const EMPTY_META: ScoreMeta = { fifths: null, timeSig: null, measures: [], transpose: NO_TRANSPOSE };
 
 /** Read key signature, time signature and measure spans from a loaded OSMD. Defensive: never throws. */
 export function readScoreMeta(osmd: any, bpm: number): ScoreMeta {
@@ -58,7 +62,8 @@ export function readScoreMeta(osmd: any, bpm: number): ScoreMeta {
       const dur = (m.Duration?.RealValue ?? m.ActiveTimeSignature?.RealValue ?? 0) * secPerWhole;
       return { number: m.MeasureNumber ?? i + 1, startSec: start, endSec: start + dur };
     });
-    return { fifths, keyChanges, timeSig, measures };
+    const transpose = summarizeTranspose((sheet.Instruments ?? []).map((i: any) => i?.PlaybackTranspose ?? 0));
+    return { fifths, keyChanges, timeSig, measures, transpose };
   } catch {
     return EMPTY_META;
   }

@@ -46,6 +46,7 @@ import { applyInterfaceVars } from "@/lib/colors/store";
 import { LibrarySheet } from "@/components/reader/LibrarySheet";
 import { useLibrary } from "@/lib/library/useLibrary";
 import { detectKeyFromNotes } from "@/lib/music/analysis/key";
+import { analysisFifths, analysisNotes } from "@/lib/music/transpose";
 import { displayTitle, xmlTitle } from "@/lib/library/entry";
 import type { IsolationMode, ScheduledNote, ScoreView as ViewMode } from "@/lib/music/types";
 
@@ -145,7 +146,8 @@ export function ReaderPage() {
   const keyLabelNow = useMemo(() => {
     if (!scoreData?.notes.length) return undefined;
     try {
-      return detectKeyFromNotes(scoreData.notes, scoreData.meta.fifths).best.key.label;
+      const tr = scoreData.meta.transpose;
+      return detectKeyFromNotes(analysisNotes(scoreData.notes, tr), analysisFifths(scoreData.meta.fifths, tr)).best.key.label;
     } catch {
       return undefined;
     }
@@ -478,6 +480,7 @@ export function ReaderPage() {
         chordNamesLayer={chordNamesLayer}
         degradeCap={degradeCap}
         scoreReady={scoreData !== null}
+        hasTranspose={(scoreData?.meta.transpose.kind ?? "none") !== "none"}
       />
       <main className={`flex flex-1 flex-col ${tocar ? "min-h-0" : ""}`}>
         <section className={`flex-1 ${tocar ? "min-h-0 border-b border-border" : ""}`}>

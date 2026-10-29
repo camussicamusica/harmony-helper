@@ -7,6 +7,7 @@ import { ColorStudio } from "@/components/studio/ColorStudio";
 import { NoteColorStrip } from "./NoteColorStrip";
 import { IntervalStrip } from "./IntervalStrip";
 import { LINE_MODES, type LineColorMode } from "@/lib/music/lineMode";
+import { useColorBy, type ColorBy } from "@/lib/colors/colorBy";
 import { nextTheme, THEME_LABEL, type ThemePref } from "@/lib/ui/theme";
 import { UploadZone } from "./UploadZone";
 import { MidiControl } from "./MidiControl";
@@ -57,7 +58,14 @@ interface Props {
   degradeCap: number;
   /** The score has been read: "no repeated measures" is then a fact. */
   scoreReady: boolean;
+  /** Some part of the score transposes (written and sounding pitch differ): shows "Color por". */
+  hasTranspose: boolean;
 }
+
+const COLOR_BY: { id: ColorBy; label: string }[] = [
+  { id: "written", label: "escrita" },
+  { id: "sounding", label: "suena" },
+];
 
 export function TopBar({
   isPlaying,
@@ -98,8 +106,10 @@ export function TopBar({
   chordNamesLayer,
   degradeCap,
   scoreReady,
+  hasTranspose,
 }: Props) {
   const [layersOpen, setLayersOpen] = useLayersOpen();
+  const [colorBy, setColorBy] = useColorBy();
   const isoLabel: Record<IsolationMode, string> = {
     both: "Dos manos",
     rh: "Mano derecha",
@@ -305,6 +315,27 @@ export function TopBar({
         </label>
 
         <NoteColorStrip />
+
+        {hasTranspose && (
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground" role="group" aria-label="Color por" data-testid="color-by">
+            <span>Color por:</span>
+            <div className="flex items-center gap-0.5 rounded-md border border-border p-0.5">
+              {COLOR_BY.map((o) => (
+                <button
+                  key={o.id}
+                  type="button"
+                  onClick={() => setColorBy(o.id)}
+                  aria-pressed={colorBy === o.id}
+                  className={`rounded px-2 py-0.5 text-xs ${
+                    colorBy === o.id ? "bg-secondary text-secondary-foreground" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <MidiControl />
 

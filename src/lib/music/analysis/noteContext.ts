@@ -5,6 +5,7 @@ import { FUNCTION_SHORT, functionOf, isSeventh, romanFor, type ChordFunction, ty
 import type { KeyInfo } from "./key";
 import { detectChordParts, type PieceChord } from "./pieceChords";
 import { figureOf, momentOf, type Figure, type Moment } from "./noteFigure";
+import { writtenAndSounding } from "../transpose";
 
 const EPS = 1e-3;
 const mod12 = (n: number) => ((n % 12) + 12) % 12;
@@ -69,6 +70,8 @@ export interface MelodyStep {
 
 export interface NoteContext {
   pitch: { spelled: string; label: string; octave: number; octaveLabel: string };
+  /** "Sol5 (G5)" / "Fa5 (F5)" when the note's part transposes (B♭ trumpet), else null. */
+  transposed: { written: string; sounding: string } | null;
   keyRole: KeyRole | null;
   /** The figure printed with the note: same staff, same onset. */
   figure: Figure;
@@ -280,24 +283,30 @@ function stepOf(note: ScheduledNote, other: ScheduledNote, dir: -1 | 1): MelodyS
 
 // ---------- main ----------
 
+/** Name of a note as printed: spelling plus octave. */
+export function pitchOf(note: ScheduledNote): NoteContext["pitch"] {
+  const octave = octaveOf(note.midi, note.spelledName);
+  return {
+    spelled: note.spelledName,
+    label: noteLabel(note.spelledName),
+    octave,
+    octaveLabel: `${solfegeName(note.spelledName)}${octave}`,
+  };
+}
+
 /**
  * Everything the hover panel says about one note. Pure: depends only on its arguments.
  * `key` null = no key known (the section is left out); `chords` = the piece's chord analysis (may be empty).
  */
 export function noteContext(note: ScheduledNote, all: ScheduledNote[], key: KeyInfo | null, chords: PieceChord[]): NoteContext {
-  const octave = octaveOf(note.midi, note.spelledName);
   const prev = neighbour(note, all, -1);
   const next = neighbour(note, all, 1);
   const figure = figureOf(note, all);
   return {
     figure,
     moment: momentOf(note, all, figure),
-    pitch: {
-      spelled: note.spelledName,
-      label: noteLabel(note.spelledName),
-      octave,
-      octaveLabel: `${solfegeName(note.spelledName)}${octave}`,
-    },
+    pitch: pitchOf(note),
+    transposed: writtenAndSounding(note),
     keyRole: key ? keyRoleOf(note.spelledName, key) : null,
     chord: chordForNote(note, all, key, chords),
     melody: {

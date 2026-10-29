@@ -1,5 +1,6 @@
 import * as Tone from "tone";
 import type { Hand, IsolationMode, ScheduledNote } from "./types";
+import { soundingOf } from "./transpose";
 
 type Listener = () => void;
 
@@ -212,14 +213,16 @@ function scheduleNotes(samp: Tone.Sampler, notes: ScheduledNote[]) {
   for (const note of notes) {
     const id = Tone.getTransport().schedule((time) => {
       if (!shouldPlay(note.hand)) return;
-      const freq = Tone.Frequency(note.midi, "midi").toFrequency();
+      // Plays what sounds (a B♭ trumpet's written Sol5 is Fa5); the piano below lights the same key.
+      const sounding = soundingOf(note);
+      const freq = Tone.Frequency(sounding, "midi").toFrequency();
       samp.triggerAttackRelease(freq, note.durationSec, time);
       Tone.getDraw().schedule(() => {
-        activeNotes.add(note.midi, note.hand);
+        activeNotes.add(sounding, note.hand);
         markPlaying(note, true);
       }, time);
       Tone.getDraw().schedule(() => {
-        activeNotes.remove(note.midi, note.hand);
+        activeNotes.remove(sounding, note.hand);
         markPlaying(note, false);
       }, time + note.durationSec);
     }, note.startSec);
