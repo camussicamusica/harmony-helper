@@ -1,14 +1,22 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { MidiControl } from "@/components/reader/MidiControl";
 import { applyInterfaceVars } from "@/lib/colors/store";
 import { NoteDeckGame } from "./NoteDeckGame";
+import { SingGame } from "./SingGame";
 
 /** The games that are planned but not built yet: greyed out. */
-const SOON = ["Mazo de figuras", "Dictado rítmico", "Cantar"];
+const SOON = ["Mazo de figuras", "Dictado rítmico"];
+
+const GAMES = [
+  { id: "deck", label: "Mazo de notas" },
+  { id: "sing", label: "Cantar" },
+] as const;
+type GameId = (typeof GAMES)[number]["id"];
 
 /** /juegos: a quiet page (grey, no scores). The only color on screen is her note colors on flipped cards. */
 export function GamesPage() {
+  const [game, setGame] = useState<GameId>("deck");
   useEffect(() => {
     applyInterfaceVars(); // same interface variables as the reader (reads her palette, writes nothing)
   }, []);
@@ -27,13 +35,19 @@ export function GamesPage() {
 
       <main className="mx-auto max-w-3xl space-y-6 px-4 py-6">
         <nav aria-label="Juegos" className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            aria-current="page"
-            className="rounded-md border border-border bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground"
-          >
-            Mazo de notas
-          </button>
+          {GAMES.map((g) => (
+            <button
+              key={g.id}
+              type="button"
+              aria-current={game === g.id ? "page" : undefined}
+              onClick={() => setGame(g.id)}
+              className={`rounded-md border border-border px-3 py-1.5 text-sm ${
+                game === g.id ? "bg-secondary font-medium text-secondary-foreground" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {g.label}
+            </button>
+          ))}
           {SOON.map((name) => (
             <button
               key={name}
@@ -46,7 +60,7 @@ export function GamesPage() {
           ))}
         </nav>
 
-        <NoteDeckGame />
+        {game === "deck" ? <NoteDeckGame /> : <SingGame />}
       </main>
     </div>
   );
